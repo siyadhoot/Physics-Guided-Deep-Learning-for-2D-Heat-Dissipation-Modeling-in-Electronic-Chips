@@ -1,0 +1,200 @@
+[
+  {
+    "sample_id": 0,
+    "split": "test_calibration",
+    "seed": 999000000,
+    "difficulty": "normal",
+    "pattern_type": "D",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 1,
+    "split": "test_calibration",
+    "seed": 999000001,
+    "difficulty": "challenging",
+    "pattern_type": "H",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 2,
+    "split": "test_calibration",
+    "seed": 999000002,
+    "difficulty": "normal",
+    "pattern_type": "D",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 3,
+    "split": "test_calibration",
+    "seed": 999000003,
+    "difficulty": "normal",
+    "pattern_type": "J",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 4,
+    "split": "test_calibration",
+    "seed": 999000004,
+    "difficulty": "challenging",
+    "pattern_type": "E",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 5,
+    "split": "test_calibration",
+    "seed": 999000005,
+    "difficulty": "normal",
+    "pattern_type": "A",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 6,
+    "split": "test_calibration",
+    "seed": 999000006,
+    "difficulty": "normal",
+    "pattern_type": "F",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 7,
+    "split": "test_calibration",
+    "seed": 999000007,
+    "difficulty": "challenging",
+    "pattern_type": "H",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 8,
+    "split": "test_calibration",
+    "seed": 999000008,
+    "difficulty": "very_challenging",
+    "pattern_type": "E",
+    "valid": false,
+    "reason": "T_max_unphysical"
+  },
+  {
+    "sample_id": 9,
+    "split": "test_calibration",
+    "seed": 999000009,
+    "difficulty": "normal",
+    "pattern_type": "E",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 10,
+    "split": "test_calibration",
+    "seed": 999000010,
+    "difficulty": "very_challenging",
+    "pattern_type": "H",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 11,
+    "split": "test_calibration",
+    "seed": 999000011,
+    "difficulty": "normal",
+    "pattern_type": "B",
+    "valid": false,
+    "reason": "T_max_unphysical"
+  },
+  {
+    "sample_id": 12,
+    "split": "test_calibration",
+    "seed": 999000012,
+    "difficulty": "normal",
+    "pattern_type": "F",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 13,
+    "split": "test_calibration",
+    "seed": 999000013,
+    "difficulty": "normal",
+    "pattern_type": "A",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 14,
+    "split": "test_calibration",
+    "seed": 999000014,
+    "difficulty": "normal",
+    "pattern_type": "F",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 15,
+    "split": "test_calibration",
+    "seed": 999000015,
+    "difficulty": "normal",
+    "pattern_type": "C",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 16,
+    "split": "test_calibration",
+    "seed": 999000016,
+    "difficulty": "very_challenging",
+    "pattern_type": "I",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 17,
+    "split": "test_calibration",
+    "seed": 999000017,
+    "difficulty": "normal",
+    "pattern_type": "A",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 18,
+    "split": "test_calibration",
+    "seed": 999000018,
+    "difficulty": "normal",
+    "pattern_type": "G",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 19,
+    "split": "test_calibration",
+    "seed": 999000019,
+    "difficulty": "normal",
+    "pattern_type": "F",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 20,
+    "split": "test_calibration",
+    "seed": 999000020,
+    "difficulty": "normal",
+    "pattern_type": "D",
+    "valid": true,
+    "reason": "ok"
+  },
+  {
+    "sample_id": 21,
+    "split": "test_calibration",
+    "seed": 999000021,
+    "difficulty": "normal",
+    "pattern_type": "E",
+    "valid": true,
+    "reason": "ok"
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "n_valid": 20,
+  "n_attempts": 22,
+  "T_max_range": [
+    311.4739212175668,
+    376.75753572063337
+  ],
+  "delta_T_range": [
+    11.775358097786182,
+    80.61744552229328
+  ],
+  "residual_max_worst": 2.7256208719868434e-07,
+  "balance_error_pct_worst": 1.0240110556167313e-05,
+  "iterations_mean": 11.0,
+  "iterations_max": 12,
+  "kirchhoff_roundtrip_worst_K": 1.0231815394945443e-12,
+  "seconds_per_sample": 0.03077685832977295
+}
