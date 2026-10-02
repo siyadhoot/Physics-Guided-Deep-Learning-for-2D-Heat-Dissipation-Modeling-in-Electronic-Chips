@@ -1,0 +1,57 @@
+{
+  "total_samples": 8000,
+  "sample_counts_by_split": {
+    "train": 6400,
+    "val": 800,
+    "test": 800
+  },
+  "grid_size": 32,
+  "domain_length_m": 0.01,
+  "temperature_K": {
+    "min": 295.03425342683215,
+    "max": 499.78802549394067,
+    "mean": 326.44314025984835,
+    "std": 30.34958036167456
+  },
+  "pde_residual": {
+    "mean_of_means": 5.5025477048105055e-09,
+    "worst_max": 1.2982823233085329e-06
+  },
+  "heat_balance_error_pct": {
+    "mean": 2.716162808296571e-06,
+    "worst": 5.282022593128022e-05
+  },
+  "kirchhoff_roundtrip_error_K": {
+    "mean": 2.830020662258903e-13,
+    "worst": 2.7682744985213503e-11
+  },
+  "total_rejections": 519,
+  "rejection_breakdown": {
+    "T_max_unphysical": 519
+  },
+  "difficulty_level_counts": {
+    "challenging": 2020,
+    "normal": 4921,
+    "very_challenging": 1059
+  },
+  "power_pattern_type_counts": {
+    "J": 879,
+    "G": 1204,
+    "A": 635,
+    "B": 864,
+    "E": 1290,
+    "I": 577,
+    "C": 623,
+    "F": 599,
+    "H": 690,
+    "D": 639
+  },
+  "boundary_scenario_counts": {
+    "bottom_cooled_sides_insulated": 1317,
+    "all_insulated_sink_only": 1263,
+    "top_cooled_sides_insulated": 1343,
+    "mixed_dirichlet_convective": 1430,
+    "asymmetric_cooling": 1294,
+    "all_edges_convective": 1353
+  }
+}
