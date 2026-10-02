@@ -1,0 +1,8 @@
+{
+  "next_attempt": 6836,
+  "valid_count": 6400,
+  "n_shards": 13,
+  "rejections": {
+    "T_max_unphysical": 436
+  }
+}
