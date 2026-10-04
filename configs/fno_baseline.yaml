@@ -1,0 +1,43 @@
+# Baseline 2D FNO for Kirchhoff potential (theta) prediction
+# Input:  [B, 23, 32, 32]  leakage-free channels from ml_data
+# Output: [B,  1, 32, 32]  predicted theta (NOT temperature T)
+
+seed: 42
+
+model:
+  name: fno2d_baseline
+  in_channels: 23
+  out_channels: 1
+  width: 32
+  modes1: 8
+  modes2: 8
+  n_layers: 4
+  mlp_ratio: 1.0
+  activation: gelu
+  use_grid: true
+
+data:
+  batch_size: 32
+  num_workers: 0
+  normalize: true
+
+train:
+  epochs: 100
+  lr: 0.001
+  weight_decay: 1.0e-4
+  optimizer: adamw
+  loss: mse
+  grad_clip: 1.0
+  # cosine annealing with warm restarts disabled — plain CosineAnnealingLR
+  scheduler: cosine
+  scheduler_T_max: 100
+  scheduler_eta_min: 1.0e-6
+  early_stopping_patience: 15
+  early_stopping_min_delta: 1.0e-6
+  log_every: 50
+
+paths:
+  checkpoint_dir: outputs/fno_baseline/checkpoints
+  history_path: outputs/fno_baseline/history.json
+  best_checkpoint: outputs/fno_baseline/checkpoints/best.pt
+  last_checkpoint: outputs/fno_baseline/checkpoints/last.pt

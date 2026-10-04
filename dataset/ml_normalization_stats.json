@@ -1,0 +1,263 @@
+{
+  "_note": "Computed on the TRAINING split only (6400 samples). Categorical channels (material, bc_type_*) are not normalized. Continuous channels use z-score (x - mean) / std at load time. Validation/test must never contribute to these statistics. kx_base/ky_base are derived from material + k_ref + ax/ay (never from converged kx/ky). n_silicon uses the seed-reconstructed actual exponent.",
+  "split": "train",
+  "n_samples": 6400,
+  "channels": {
+    "Q": {
+      "mean": 45038.485268299235,
+      "std": 97418.00769345408,
+      "min": 1002.6253051757812,
+      "max": 2137176.5,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "material": {
+      "normalization": "none",
+      "reason": "categorical / discrete code \u2014 not z-scored",
+      "split": "train"
+    },
+    "kx_base": {
+      "mean": 240.59892621496522,
+      "std": 231.59495849512834,
+      "min": 0.45472443103790283,
+      "max": 1341.321044921875,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "ky_base": {
+      "mean": 237.7690366374368,
+      "std": 230.4856868207139,
+      "min": 0.4607652425765991,
+      "max": 1338.5360107421875,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "ax": {
+      "mean": 1.3538021275699383,
+      "std": 0.5639710051710686,
+      "min": 0.30000269412994385,
+      "max": 2.9999735355377197,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "ay": {
+      "mean": 1.3396175800267793,
+      "std": 0.5634558352364678,
+      "min": 0.300103098154068,
+      "max": 2.999795436859131,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "bc_type_left": {
+      "normalization": "none",
+      "reason": "categorical / discrete code \u2014 not z-scored",
+      "split": "train"
+    },
+    "bc_type_right": {
+      "normalization": "none",
+      "reason": "categorical / discrete code \u2014 not z-scored",
+      "split": "train"
+    },
+    "bc_type_bottom": {
+      "normalization": "none",
+      "reason": "categorical / discrete code \u2014 not z-scored",
+      "split": "train"
+    },
+    "bc_type_top": {
+      "normalization": "none",
+      "reason": "categorical / discrete code \u2014 not z-scored",
+      "split": "train"
+    },
+    "bc_h_left": {
+      "mean": 0.5438194111874327,
+      "std": 7.666738977931936,
+      "min": 0.0,
+      "max": 239.9913330078125,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "bc_h_right": {
+      "mean": 0.5555941170919687,
+      "std": 7.79858227465921,
+      "min": 0.0,
+      "max": 239.83360290527344,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "bc_h_bottom": {
+      "mean": 1.8321073282719589,
+      "std": 19.578039878832005,
+      "min": 0.0,
+      "max": 299.84466552734375,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "bc_h_top": {
+      "mean": 1.8818069377029314,
+      "std": 19.91202161701802,
+      "min": 0.0,
+      "max": 299.91937255859375,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "bc_T_left": {
+      "mean": 3.6242926931381225,
+      "std": 32.77033288003297,
+      "min": 0.0,
+      "max": 304.9969482421875,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "bc_T_right": {
+      "mean": 3.627154430001974,
+      "std": 32.78281698319746,
+      "min": 0.0,
+      "max": 304.9942626953125,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "bc_T_bottom": {
+      "mean": 5.160113157778978,
+      "std": 38.99938121357442,
+      "min": 0.0,
+      "max": 304.9969482421875,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "bc_T_top": {
+      "mean": 5.203534757196903,
+      "std": 39.163862405945224,
+      "min": 0.0,
+      "max": 304.99725341796875,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "h_sink": {
+      "mean": 2565.049704192877,
+      "std": 1427.2805714453104,
+      "min": 100.66908264160156,
+      "max": 4998.4677734375,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "T_ambient": {
+      "mean": 299.9205776643753,
+      "std": 2.886477224113579,
+      "min": 295.0030517578125,
+      "max": 304.99822998046875,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "n_dielectric": {
+      "mean": 0.24885502575276974,
+      "std": 0.14539865159864912,
+      "min": 3.198147896910086e-05,
+      "max": 0.49997276067733765,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "n_silicon": {
+      "mean": 1.2611224473081528,
+      "std": 0.1457367466652544,
+      "min": 1.0000022649765015,
+      "max": 1.499980092048645,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    },
+    "n_copper": {
+      "mean": 0.2487304560642224,
+      "std": 0.08656449601439345,
+      "min": 0.10002747923135757,
+      "max": 0.3999042212963104,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    }
+  },
+  "target": {
+    "theta": {
+      "mean": 24.486458583736656,
+      "std": 27.51113387322237,
+      "min": -5.027667045593262,
+      "max": 196.590087890625,
+      "count": 6553600,
+      "split": "train",
+      "normalization": "zscore"
+    }
+  },
+  "reused_original_channel_crosscheck": {
+    "Q": {
+      "original_mean": 45038.485268299235,
+      "new_mean": 45038.485268299235,
+      "original_std": 97418.00769345426,
+      "new_std": 97418.00769345408,
+      "mean_abs_diff": 0.0,
+      "std_abs_diff": 1.7462298274040222e-10
+    },
+    "ax": {
+      "original_mean": 1.3538021275699383,
+      "new_mean": 1.3538021275699383,
+      "original_std": 0.5639710051710711,
+      "new_std": 0.5639710051710686,
+      "mean_abs_diff": 0.0,
+      "std_abs_diff": 2.55351295663786e-15
+    },
+    "ay": {
+      "original_mean": 1.3396175800267793,
+      "new_mean": 1.3396175800267793,
+      "original_std": 0.5634558352364687,
+      "new_std": 0.5634558352364678,
+      "mean_abs_diff": 0.0,
+      "std_abs_diff": 8.881784197001252e-16
+    }
+  },
+  "categorical_channels": [
+    "bc_type_bottom",
+    "bc_type_left",
+    "bc_type_right",
+    "bc_type_top",
+    "material"
+  ],
+  "channel_order": [
+    "Q",
+    "material",
+    "kx_base",
+    "ky_base",
+    "ax",
+    "ay",
+    "bc_type_left",
+    "bc_type_right",
+    "bc_type_bottom",
+    "bc_type_top",
+    "bc_h_left",
+    "bc_h_right",
+    "bc_h_bottom",
+    "bc_h_top",
+    "bc_T_left",
+    "bc_T_right",
+    "bc_T_bottom",
+    "bc_T_top",
+    "h_sink",
+    "T_ambient",
+    "n_dielectric",
+    "n_silicon",
+    "n_copper"
+  ]
+}
