@@ -37,7 +37,8 @@ train:
   log_every: 50
 
 paths:
-  checkpoint_dir: outputs/fno_baseline/checkpoints
+  checkpoint_dir: checkpoints/baseline
   history_path: outputs/fno_baseline/history.json
-  best_checkpoint: outputs/fno_baseline/checkpoints/best.pt
-  last_checkpoint: outputs/fno_baseline/checkpoints/last.pt
+  best_checkpoint: checkpoints/baseline/fno_baseline_best.pt
+  last_checkpoint: checkpoints/baseline/fno_baseline_last.pt
+  viz_dir: outputs/fno_baseline/visualizations

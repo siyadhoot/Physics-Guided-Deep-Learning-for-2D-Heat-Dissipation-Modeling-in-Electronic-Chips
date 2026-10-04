@@ -3,7 +3,8 @@ Supervised baseline training for the 2D FNO (theta prediction).
 
 Loss = MSE(predicted_theta, target_theta)
 
-Does not include physics loss. Does not modify HDF5 / dataset_generator files.
+Does not include physics loss, PDE residuals, or hard constraints.
+Does not modify HDF5 / dataset_generator files.
 
 Usage
 -----
@@ -23,6 +24,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
@@ -127,7 +129,11 @@ def evaluate(model: nn.Module, loader, device: torch.device, criterion) -> float
         X = X.to(device, non_blocking=True)
         y = y.to(device, non_blocking=True)
         pred = model(X)
+        if not torch.isfinite(pred).all():
+            raise ValueError("CRITICAL: Non-finite prediction encountered during evaluation!")
         loss = criterion(pred, y)
+        if not torch.isfinite(loss).all():
+            raise ValueError("CRITICAL: Non-finite loss encountered during evaluation!")
         bs = X.shape[0]
         total_loss += loss.item() * bs
         n += bs
@@ -150,16 +156,36 @@ def train_one_epoch(
     for step, (X, y) in enumerate(loader, start=1):
         X = X.to(device, non_blocking=True)
         y = y.to(device, non_blocking=True)
+
+        if not torch.isfinite(X).all():
+            raise ValueError(f"CRITICAL: Non-finite input X at epoch {epoch}, step {step}")
+        if not torch.isfinite(y).all():
+            raise ValueError(f"CRITICAL: Non-finite target y at epoch {epoch}, step {step}")
+
         optimizer.zero_grad(set_to_none=True)
         pred = model(X)
+        if not torch.isfinite(pred).all():
+            raise ValueError(f"CRITICAL: Non-finite prediction at epoch {epoch}, step {step}")
+
         loss = criterion(pred, y)
+        if not torch.isfinite(loss).all():
+            raise ValueError(f"CRITICAL: Non-finite loss at epoch {epoch}, step {step}")
+
         loss.backward()
+
+        # Check gradients
+        for name, p in model.named_parameters():
+            if p.grad is not None and not torch.isfinite(p.grad).all():
+                raise ValueError(f"CRITICAL: Non-finite gradient in {name} at epoch {epoch}, step {step}")
+
         if grad_clip is not None and grad_clip > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+
         optimizer.step()
         bs = X.shape[0]
         total_loss += loss.item() * bs
         n += bs
+
         if log_every and step % log_every == 0:
             print(
                 f"  epoch {epoch:03d} step {step:04d}  "
@@ -192,58 +218,216 @@ def save_checkpoint(
     torch.save(payload, path)
 
 
+@torch.no_grad()
+def evaluate_test_set(
+    model: nn.Module,
+    loader,
+    device: torch.device,
+) -> Dict[str, float]:
+    """Evaluate model on held-out test set for MSE, MAE, RMSE, and Relative L2 Error."""
+    model.eval()
+    mse_loss_fn = nn.MSELoss(reduction="none")
+    mae_loss_fn = nn.L1Loss(reduction="none")
+
+    total_mse = 0.0
+    total_mae = 0.0
+    total_samples = 0
+    rel_l2_errors = []
+
+    for X, y in loader:
+        X = X.to(device, non_blocking=True)
+        y = y.to(device, non_blocking=True)
+        pred = model(X)
+
+        if not torch.isfinite(pred).all():
+            raise ValueError("CRITICAL: Non-finite prediction encountered during test evaluation!")
+
+        bs = X.shape[0]
+        mse_batch = mse_loss_fn(pred, y).mean(dim=(1, 2, 3))
+        mae_batch = mae_loss_fn(pred, y).mean(dim=(1, 2, 3))
+
+        total_mse += mse_batch.sum().item()
+        total_mae += mae_batch.sum().item()
+        total_samples += bs
+
+        # Relative L2 error per sample: ||pred - y||_2 / ||y||_2
+        diff_flat = (pred - y).view(bs, -1)
+        target_flat = y.view(bs, -1)
+        rel_l2 = torch.norm(diff_flat, p=2, dim=1) / torch.clamp(torch.norm(target_flat, p=2, dim=1), min=1e-8)
+        rel_l2_errors.extend(rel_l2.cpu().numpy().tolist())
+
+    test_mse = total_mse / max(total_samples, 1)
+    test_mae = total_mae / max(total_samples, 1)
+    test_rmse = float(np.sqrt(test_mse))
+    test_rel_l2_mean = float(np.mean(rel_l2_errors))
+    test_rel_l2_median = float(np.median(rel_l2_errors))
+
+    return {
+        "test_mse": test_mse,
+        "test_mae": test_mae,
+        "test_rmse": test_rmse,
+        "test_rel_l2_mean": test_rel_l2_mean,
+        "test_rel_l2_median": test_rel_l2_median,
+        "n_test_samples": total_samples,
+    }
+
+
+def generate_visualizations(
+    model: nn.Module,
+    loader,
+    device: torch.device,
+    viz_dir: Path,
+    n_samples: int = 3,
+) -> None:
+    """Generate representative side-by-side ground truth, prediction, and error plots."""
+    viz_dir.mkdir(parents=True, exist_ok=True)
+    model.eval()
+
+    X_list, y_list, pred_list = [], [], []
+
+    with torch.no_grad():
+        for X, y in loader:
+            X = X.to(device)
+            y = y.to(device)
+            pred = model(X)
+            X_list.append(X.cpu())
+            y_list.append(y.cpu())
+            pred_list.append(pred.cpu())
+            if sum(x.shape[0] for x in y_list) >= n_samples:
+                break
+
+    y_cat = torch.cat(y_list, dim=0)[:n_samples, 0].numpy()
+    pred_cat = torch.cat(pred_list, dim=0)[:n_samples, 0].numpy()
+    abs_err_cat = np.abs(y_cat - pred_cat)
+
+    # Save raw arrays
+    np.savez_compressed(
+        viz_dir / "test_samples_theta.npz",
+        ground_truth=y_cat,
+        predicted=pred_cat,
+        abs_error=abs_err_cat,
+    )
+
+    for i in range(n_samples):
+        fig, axes = plt.subplots(1, 3, figsize=(13, 3.8))
+
+        vmin = min(y_cat[i].min(), pred_cat[i].min())
+        vmax = max(y_cat[i].max(), pred_cat[i].max())
+
+        im0 = axes[0].imshow(y_cat[i], cmap="inferno", vmin=vmin, vmax=vmax)
+        axes[0].set_title(f"Test Sample {i+1}: Ground Truth θ")
+        fig.colorbar(im0, ax=axes[0])
+
+        im1 = axes[1].imshow(pred_cat[i], cmap="inferno", vmin=vmin, vmax=vmax)
+        axes[1].set_title(f"Test Sample {i+1}: FNO Predicted θ")
+        fig.colorbar(im1, ax=axes[1])
+
+        im2 = axes[2].imshow(abs_err_cat[i], cmap="viridis")
+        axes[2].set_title(f"Test Sample {i+1}: Abs Error |θ - θ_pred|")
+        fig.colorbar(im2, ax=axes[2])
+
+        plt.tight_layout()
+        plot_path = viz_dir / f"test_sample_{i+1}.png"
+        plt.savefig(plot_path, dpi=150)
+        plt.close(fig)
+        print(f"Saved test visualization: {plot_path}")
+
+
 def train(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    start_time_total = time.time()
     set_seed(int(cfg.get("seed", 42)))
     device = get_device()
+
+    print("=" * 65)
+    print("STARTING FULL PRODUCTION BASELINE FNO TRAINING RUN")
+    print("=" * 65)
     print(f"Device: {device}")
 
     model = build_fno_from_config(cfg).to(device)
     n_params = count_parameters(model)
-    print(f"Model: FNO2d  params={n_params:,}")
+    print(f"Model: FNO2d  trainable parameters={n_params:,}")
 
     data_cfg = cfg["data"]
+    batch_size = int(data_cfg["batch_size"])
+    num_workers = int(data_cfg.get("num_workers", 0))
+    normalize = bool(data_cfg.get("normalize", True))
+
     train_loader = make_dataloader(
         "train",
-        batch_size=int(data_cfg["batch_size"]),
+        batch_size=batch_size,
         shuffle=True,
-        num_workers=int(data_cfg.get("num_workers", 0)),
-        normalize=bool(data_cfg.get("normalize", True)),
+        num_workers=num_workers,
+        normalize=normalize,
     )
     val_loader = make_dataloader(
         "validation",
-        batch_size=int(data_cfg["batch_size"]),
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=int(data_cfg.get("num_workers", 0)),
-        normalize=bool(data_cfg.get("normalize", True)),
+        num_workers=num_workers,
+        normalize=normalize,
     )
+    test_loader = make_dataloader(
+        "test",
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        normalize=normalize,
+    )
+
+    n_train = len(train_loader.dataset)
+    n_val = len(val_loader.dataset)
+    n_test = len(test_loader.dataset)
+
+    print(f"Dataset sizes: train={n_train}, validation={n_val}, test={n_test}")
+
+    # Integrity & finiteness check on initial batches
+    first_X, first_y = next(iter(train_loader))
+    assert torch.isfinite(first_X).all(), "NaN/Inf in training input batch"
+    assert torch.isfinite(first_y).all(), "NaN/Inf in training target batch"
+    print("[Safety Check] Pre-training Data Finiteness: PASS (no NaN/Inf)")
 
     criterion = nn.MSELoss()
     optimizer = build_optimizer(model, cfg)
     scheduler = build_scheduler(optimizer, cfg)
 
     tcfg = cfg["train"]
+    epochs = int(tcfg["epochs"])
     early = EarlyStopping(
         patience=int(tcfg.get("early_stopping_patience", 15)),
         min_delta=float(tcfg.get("early_stopping_min_delta", 0.0)),
     )
+
     paths = cfg["paths"]
     ckpt_dir = PROJECT_ROOT / paths["checkpoint_dir"]
     best_path = PROJECT_ROOT / paths["best_checkpoint"]
     last_path = PROJECT_ROOT / paths["last_checkpoint"]
     history_path = PROJECT_ROOT / paths["history_path"]
+    viz_dir = PROJECT_ROOT / paths.get("viz_dir", "outputs/fno_baseline/visualizations")
+
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     history_path.parent.mkdir(parents=True, exist_ok=True)
+    viz_dir.mkdir(parents=True, exist_ok=True)
 
     history = []
-    best_val = float("inf")
-    epochs = int(tcfg["epochs"])
+    best_val_loss = float("inf")
+    best_epoch = 0
     grad_clip = tcfg.get("grad_clip", None)
     log_every = int(tcfg.get("log_every", 50))
+
+    initial_train_loss = evaluate(model, train_loader, device, criterion)
+    initial_val_loss = evaluate(model, val_loader, device, criterion)
+    print(f"Initial Untrained Train Loss: {initial_train_loss:.6e}")
+    print(f"Initial Untrained Val Loss:   {initial_val_loss:.6e}")
+    print("-" * 65)
 
     for epoch in range(1, epochs + 1):
         t0 = time.time()
         train_loss = train_one_epoch(
-            model, train_loader, device, criterion, optimizer,
+            model,
+            train_loader,
+            device,
+            criterion,
+            optimizer,
             grad_clip=float(grad_clip) if grad_clip is not None else None,
             log_every=log_every,
             epoch=epoch,
@@ -256,37 +440,88 @@ def train(cfg: Dict[str, Any]) -> Dict[str, Any]:
             scheduler.step()
 
         lr = optimizer.param_groups[0]["lr"]
+        epoch_time = time.time() - t0
         record = {
             "epoch": epoch,
             "train_loss": train_loss,
             "val_loss": val_loss,
             "lr": lr,
-            "seconds": time.time() - t0,
+            "seconds": epoch_time,
         }
         history.append(record)
+
         print(
             f"Epoch {epoch:03d}/{epochs}  "
             f"train_mse={train_loss:.6e}  val_mse={val_loss:.6e}  "
-            f"lr={lr:.3e}  ({record['seconds']:.1f}s)"
+            f"lr={lr:.3e}  ({epoch_time:.1f}s)"
         )
 
         improved = early.step(val_loss)
-        save_checkpoint(last_path, model, optimizer, scheduler, epoch, best_val, history, cfg)
-        if improved:
-            best_val = val_loss
-            save_checkpoint(best_path, model, optimizer, scheduler, epoch, best_val, history, cfg)
-            print(f"  -> new best checkpoint: {best_path}  (val_mse={best_val:.6e})")
+        save_checkpoint(last_path, model, optimizer, scheduler, epoch, best_val_loss, history, cfg)
 
-        with open(history_path, "w", encoding="utf-8") as f:
-            json.dump({"history": history, "best_val_loss": best_val, "n_parameters": n_params}, f, indent=2)
+        if improved:
+            best_val_loss = val_loss
+            best_epoch = epoch
+            save_checkpoint(best_path, model, optimizer, scheduler, epoch, best_val_loss, history, cfg)
+            print(f"  -> new best checkpoint: {best_path}  (val_mse={best_val_loss:.6e})")
 
         if early.should_stop:
-            print(f"Early stopping at epoch {epoch} (patience={early.patience})")
+            print(f"Early stopping triggered at epoch {epoch} (patience={early.patience})")
             break
 
-    print(f"Training finished. Best val MSE={best_val:.6e}")
-    print(f"Best checkpoint: {best_path}")
-    return {"best_val_loss": best_val, "history": history, "n_parameters": n_params}
+    total_training_time = time.time() - start_time_total
+    final_train_loss = history[-1]["train_loss"]
+    final_val_loss = history[-1]["val_loss"]
+
+    print("=" * 65)
+    print("TRAINING COMPLETE — EVALUATING BEST CHECKPOINT ON HELD-OUT TEST SET")
+    print("=" * 65)
+
+    # Load best checkpoint for test evaluation
+    best_ckpt = torch.load(best_path, map_location=device)
+    model.load_state_dict(best_ckpt["model_state_dict"])
+    print(f"Loaded best checkpoint from epoch {best_epoch} (val_mse={best_val_loss:.6e})")
+
+    test_results = evaluate_test_set(model, test_loader, device)
+    print(f"Test Evaluation Results (800 samples):")
+    print(f"  Test MSE:           {test_results['test_mse']:.6e}")
+    print(f"  Test MAE:           {test_results['test_mae']:.6e}")
+    print(f"  Test RMSE:          {test_results['test_rmse']:.6e}")
+    print(f"  Relative L2 (Mean): {test_results['test_rel_l2_mean']:.6e}")
+    print(f"  Relative L2 (Med):  {test_results['test_rel_l2_median']:.6e}")
+
+    generate_visualizations(model, test_loader, device, viz_dir, n_samples=3)
+
+    summary_data = {
+        "device": str(device),
+        "n_train_samples": n_train,
+        "n_val_samples": n_val,
+        "n_test_samples": n_test,
+        "batch_size": batch_size,
+        "total_epochs_trained": len(history),
+        "configured_max_epochs": epochs,
+        "best_epoch": best_epoch,
+        "n_parameters": n_params,
+        "optimizer": str(tcfg.get("optimizer", "adamw")),
+        "initial_lr": float(tcfg["lr"]),
+        "weight_decay": float(tcfg.get("weight_decay", 0.0)),
+        "initial_train_loss": initial_train_loss,
+        "final_train_loss": final_train_loss,
+        "initial_val_loss": initial_val_loss,
+        "final_val_loss": final_val_loss,
+        "best_val_loss": best_val_loss,
+        "test_results": test_results,
+        "total_training_time_sec": total_training_time,
+        "history": history,
+    }
+
+    with open(history_path, "w", encoding="utf-8") as f:
+        json.dump(summary_data, f, indent=2)
+
+    print(f"Saved complete history and metrics to: {history_path}")
+    print("=" * 65)
+
+    return summary_data
 
 
 def verify_forward(cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -389,5 +624,4 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
-    # Default when invoked as a script: train. Use --verify-only for checks.
     sys.exit(main())
