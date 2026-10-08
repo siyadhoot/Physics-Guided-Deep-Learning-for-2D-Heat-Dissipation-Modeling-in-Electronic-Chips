@@ -21,8 +21,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from ml_data import N_INPUT_CHANNELS, make_dataloader  # noqa: E402
-from models.fno import FNO2d, SpectralConv2d, build_fno_from_config  # noqa: E402
+from src.data import N_INPUT_CHANNELS, make_dataloader  # noqa: E402
+from src.models.fno import FNO2d, SpectralConv2d, build_fno_from_config  # noqa: E402
 
 
 class TestFNO2d(unittest.TestCase):

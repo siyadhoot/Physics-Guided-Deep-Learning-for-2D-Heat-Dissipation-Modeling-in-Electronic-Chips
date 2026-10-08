@@ -1,0 +1,23 @@
+{
+  "checkpoint_used": "C:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\experiments\\baseline\\checkpoints\\baseline\\fno_baseline_best.pt",
+  "n_test_samples": 800,
+  "temperature_unit": "Kelvin (K)",
+  "kirchhoff_roundtrip_passed": true,
+  "temperature_metrics": {
+    "mae_K": 3.1463079201622035,
+    "rmse_K": 6.277104318228201,
+    "mse_K2": 39.402038621919125,
+    "max_abs_error_K": 113.66678026496584,
+    "r2_score": 0.9573207543129104,
+    "rel_l2_mean": 0.010771447691477302,
+    "rel_l2_median": 0.006335704975520478
+  },
+  "hotspot_metrics": {
+    "mean_abs_hotspot_temp_error_K": 6.882526813222309,
+    "max_abs_hotspot_temp_error_K": 108.04380900922484,
+    "rmse_hotspot_temp_error_K": 10.809521166540673,
+    "exact_location_match_pct": 33.0,
+    "mean_location_distance_px": 3.161022726082823
+  },
+  "evaluation_time_sec": 12.084283351898193
+}

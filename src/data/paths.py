@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DATASET_DIR = PROJECT_ROOT / "dataset"
 GENERATOR_DIR = PROJECT_ROOT / "dataset_generator"
 ML_AUX_DIR = DATASET_DIR / "ml_aux"

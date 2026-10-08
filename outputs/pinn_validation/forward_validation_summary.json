@@ -1,0 +1,95 @@
+{
+  "n_samples_validated": 10,
+  "sample_reports": [
+    {
+      "sample_idx": 0,
+      "sample_id": 0,
+      "T_pred_min_K": 327.9436950683594,
+      "T_pred_max_K": 329.8005676269531,
+      "T_true_max_K": 328.18194580078125,
+      "abs_hotspot_err_K": 1.618621826171875,
+      "pde_residual_mean_W_m3": 152912432.0
+    },
+    {
+      "sample_idx": 1,
+      "sample_id": 1,
+      "T_pred_min_K": 328.21563720703125,
+      "T_pred_max_K": 329.634521484375,
+      "T_true_max_K": 341.56109619140625,
+      "abs_hotspot_err_K": 11.92657470703125,
+      "pde_residual_mean_W_m3": 195548640.0
+    },
+    {
+      "sample_idx": 2,
+      "sample_id": 2,
+      "T_pred_min_K": 328.08013916015625,
+      "T_pred_max_K": 329.3841857910156,
+      "T_true_max_K": 331.23577880859375,
+      "abs_hotspot_err_K": 1.851593017578125,
+      "pde_residual_mean_W_m3": 212025280.0
+    },
+    {
+      "sample_idx": 3,
+      "sample_id": 3,
+      "T_pred_min_K": 328.3052673339844,
+      "T_pred_max_K": 329.6772766113281,
+      "T_true_max_K": 347.1988830566406,
+      "abs_hotspot_err_K": 17.5216064453125,
+      "pde_residual_mean_W_m3": 202567648.0
+    },
+    {
+      "sample_idx": 4,
+      "sample_id": 4,
+      "T_pred_min_K": 328.1158752441406,
+      "T_pred_max_K": 329.4283447265625,
+      "T_true_max_K": 416.9291076660156,
+      "abs_hotspot_err_K": 87.50076293945312,
+      "pde_residual_mean_W_m3": 55654520.0
+    },
+    {
+      "sample_idx": 5,
+      "sample_id": 5,
+      "T_pred_min_K": 328.3560485839844,
+      "T_pred_max_K": 329.61785888671875,
+      "T_true_max_K": 320.43115234375,
+      "abs_hotspot_err_K": 9.18670654296875,
+      "pde_residual_mean_W_m3": 252071072.0
+    },
+    {
+      "sample_idx": 6,
+      "sample_id": 6,
+      "T_pred_min_K": 328.171875,
+      "T_pred_max_K": 329.4442138671875,
+      "T_true_max_K": 311.55401611328125,
+      "abs_hotspot_err_K": 17.89019775390625,
+      "pde_residual_mean_W_m3": 262133600.0
+    },
+    {
+      "sample_idx": 7,
+      "sample_id": 7,
+      "T_pred_min_K": 327.9969482421875,
+      "T_pred_max_K": 329.3110046386719,
+      "T_true_max_K": 369.73040771484375,
+      "abs_hotspot_err_K": 40.419403076171875,
+      "pde_residual_mean_W_m3": 49355236.0
+    },
+    {
+      "sample_idx": 8,
+      "sample_id": 8,
+      "T_pred_min_K": 328.0542907714844,
+      "T_pred_max_K": 329.9985046386719,
+      "T_true_max_K": 332.7996826171875,
+      "abs_hotspot_err_K": 2.801177978515625,
+      "pde_residual_mean_W_m3": 95731592.0
+    },
+    {
+      "sample_idx": 9,
+      "sample_id": 9,
+      "T_pred_min_K": 328.20721435546875,
+      "T_pred_max_K": 329.92132568359375,
+      "T_true_max_K": 423.0755615234375,
+      "abs_hotspot_err_K": 93.15423583984375,
+      "pde_residual_mean_W_m3": 47203036.0
+    }
+  ]
+}
