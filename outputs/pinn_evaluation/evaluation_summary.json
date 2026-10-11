@@ -1,0 +1,138 @@
+{
+  "status": "SUCCESS",
+  "timestamp_utc": "2026-10-10T17:51:11.580699+00:00",
+  "execution_duration_sec": 6.760863304138184,
+  "device": "cpu",
+  "seed": 42,
+  "split_evaluated": "validation (800 samples, 819,200 pixels)",
+  "test_set_status": "STRICTLY LOCKED - NEVER ACCESSED (Verified via SHA256)",
+  "pinn_checkpoint": {
+    "checkpoint_path": "C:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\experiments\\physics_guided\\checkpoints\\pinn_best.pt",
+    "keys_present": [
+      "epoch",
+      "model_state_dict",
+      "optimizer_state_dict",
+      "scheduler_state_dict",
+      "best_val_loss",
+      "config",
+      "history",
+      "n_parameters"
+    ],
+    "epoch": 91,
+    "best_val_loss": 0.42297610357403753,
+    "n_parameters": 530433,
+    "config": {
+      "seed": 42,
+      "batch_size": 8,
+      "epochs": 100,
+      "learning_rate": 0.001,
+      "weight_decay": 0.0001,
+      "patience": 15,
+      "min_delta": 1e-06,
+      "w_data": 1.0,
+      "w_pde": 0.0001,
+      "w_bc": 0.01,
+      "in_channels": 23,
+      "out_channels": 1,
+      "width": 32,
+      "modes1": 8,
+      "modes2": 8,
+      "n_layers": 4,
+      "n_parameters": 530433
+    },
+    "history_epochs": 91
+  },
+  "baseline_checkpoint": {
+    "checkpoint_path": "C:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\experiments\\baseline\\checkpoints\\baseline\\fno_baseline_best.pt",
+    "epoch": 64,
+    "best_val_loss": 0.05316782098263502,
+    "n_parameters": 530433,
+    "config": {
+      "seed": 42,
+      "model": {
+        "name": "fno2d_baseline",
+        "in_channels": 23,
+        "out_channels": 1,
+        "width": 32,
+        "modes1": 8,
+        "modes2": 8,
+        "n_layers": 4,
+        "mlp_ratio": 1.0,
+        "activation": "gelu",
+        "use_grid": true
+      },
+      "data": {
+        "batch_size": 32,
+        "num_workers": 0,
+        "normalize": true
+      },
+      "train": {
+        "epochs": 100,
+        "lr": 0.001,
+        "weight_decay": 0.0001,
+        "optimizer": "adamw",
+        "loss": "mse",
+        "grad_clip": 1.0,
+        "scheduler": "cosine",
+        "scheduler_T_max": 100,
+        "scheduler_eta_min": 1e-06,
+        "early_stopping_patience": 15,
+        "early_stopping_min_delta": 1e-06,
+        "log_every": 50
+      },
+      "paths": {
+        "checkpoint_dir": "checkpoints/baseline",
+        "history_path": "outputs/fno_baseline/history.json",
+        "best_checkpoint": "checkpoints/baseline/fno_baseline_best.pt",
+        "last_checkpoint": "checkpoints/baseline/fno_baseline_last.pt",
+        "viz_dir": "outputs/fno_baseline/visualizations"
+      }
+    }
+  },
+  "key_results": {
+    "pinn_mae_kelvin": 10.5729921979554,
+    "pinn_rmse_kelvin": 14.740777477349976,
+    "pinn_bias_kelvin": -8.914207883334111,
+    "pinn_max_abs_err_kelvin": 179.89694171453584,
+    "pinn_r2_score": 0.797695960777786,
+    "pinn_hotspot_mae_kelvin": 34.322096061280234,
+    "pinn_hotspot_loc_dist_mean_cells": 9.66061526606055,
+    "pinn_pde_res_mean_physical_W_m3": 80725291.6141
+  },
+  "baseline_comparison": {
+    "available": true,
+    "baseline_mae_kelvin": 3.6513919773214956,
+    "baseline_rmse_kelvin": 7.569813465166685,
+    "baseline_r2_score": 0.9466500362008651,
+    "mae_relative_improvement_pct": -189.5605912381747,
+    "rmse_relative_improvement_pct": -94.73105308580267
+  },
+  "calculated_metrics": [
+    "temperature_metrics",
+    "hotspot_metrics",
+    "physics_metrics",
+    "boundary_metrics"
+  ],
+  "unavailable_metrics": [],
+  "validation_warnings": [],
+  "fatal_errors": [],
+  "data_integrity": {
+    "all_dataset_hashes_verified": true,
+    "test_h5_unaccessed_and_unchanged": true,
+    "hashes": {
+      "validation.h5": "99572a9efea637f7ac092526c49c6b7e39b77764080f9d065dc435588c5046ba",
+      "train.h5": "9fc403ec757bed09cbd2daa9fbc3717b118bb62f922239ef10e83272417627a0",
+      "test.h5": "2efd766cb47d9659966920a31ac8f04e1ff3969e373bdd4772a79cfc23c32946",
+      "metadata.csv": "4f6c8dad81b8137e9c54ca19235ee0a8bd27ae973ccd8a43a76f23c5ffbec089"
+    }
+  },
+  "saved_artifacts": {
+    "temperature_metrics_json": "C:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\outputs\\pinn_evaluation\\temperature_metrics.json",
+    "hotspot_metrics_json": "C:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\outputs\\pinn_evaluation\\hotspot_metrics.json",
+    "physics_metrics_json": "C:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\outputs\\pinn_evaluation\\physics_metrics.json",
+    "boundary_metrics_json": "C:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\outputs\\pinn_evaluation\\boundary_metrics.json",
+    "per_sample_metrics_csv": "C:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\outputs\\pinn_evaluation\\per_sample_metrics.csv",
+    "visualizations_directory": "C:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\outputs\\pinn_evaluation\\visualizations",
+    "evaluation_guide_txt": "C:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\experiments\\physics_guided\\PINN_EVALUATION_GUIDE.txt"
+  }
+}

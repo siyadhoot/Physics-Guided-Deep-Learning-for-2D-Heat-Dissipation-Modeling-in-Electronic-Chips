@@ -1,0 +1,44 @@
+{
+  "hard_boundary_constraints_enforced": false,
+  "hard_boundary_verification_note": "Verified numerically: PhysicsInformedFNO2d produces smooth unconstrained fields; Dirichlet boundary errors are > 0, confirming boundary conditions are softly regularized via loss, not enforced exactly by structural boundary distance envelopes.",
+  "dirichlet_boundary_condition": {
+    "description": "Specified edge temperature T = T_boundary",
+    "mae_kelvin": 11.272865772247052,
+    "rmse_kelvin": 19.408188153934983,
+    "max_absolute_error_kelvin": 95.47043558123062,
+    "evaluated_points": 4544
+  },
+  "insulated_boundary_condition": {
+    "description": "Zero normal heat flux dT/dn = 0",
+    "mean_normal_gradient_K_per_m": 3775.0149121306495,
+    "max_normal_gradient_K_per_m": 107913.93415018919,
+    "evaluated_points": 54464
+  },
+  "convective_boundary_condition": {
+    "description": "Newton cooling -k dT/dn = h_edge * (T - T_ambient)",
+    "mean_surface_heat_flux_W_m2": 1839.353246398184,
+    "evaluated_points": 43392
+  },
+  "per_edge_diagnostics": {
+    "left": {
+      "dirichlet_mae_K": 12.078449504592937,
+      "insulated_normal_grad_K_m": 3878.75311902173,
+      "convective_surface_flux_W_m2": 1274.1730170391584
+    },
+    "right": {
+      "dirichlet_mae_K": 6.394536894624557,
+      "insulated_normal_grad_K_m": 3823.9815360914486,
+      "convective_surface_flux_W_m2": 916.696602727301
+    },
+    "bottom": {
+      "dirichlet_mae_K": 12.934996530906467,
+      "insulated_normal_grad_K_m": 3546.967407004698,
+      "convective_surface_flux_W_m2": 2311.9802968986346
+    },
+    "top": {
+      "dirichlet_mae_K": 13.579012698557285,
+      "insulated_normal_grad_K_m": 3807.352581701458,
+      "convective_surface_flux_W_m2": 2412.5474221139716
+    }
+  }
+}
