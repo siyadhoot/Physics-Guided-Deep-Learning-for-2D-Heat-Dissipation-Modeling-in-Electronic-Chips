@@ -53,8 +53,8 @@ class PhysicsInformedFNO2d(nn.Module):
         n_layers: int = 4,
         use_grid: bool = True,
         w_data: float = 1.0,
-        w_pde: float = 1e-4,
-        w_bc: float = 1e-2,
+        w_pde: float = 6.0e-11,
+        w_bc: float = 1.35e-5,
     ):
         super().__init__()
         self.fno = FNO2d(
@@ -155,15 +155,16 @@ class PhysicsInformedFNO2d(nn.Module):
         h_sink = torch.as_tensor(meta.get("h_sink", 1000.0), device=device, dtype=torch.float32)
         T_ambient = torch.as_tensor(meta.get("T_ambient", 300.0), device=device, dtype=torch.float32)
 
-        # Compute PDE residual in Kirchhoff space
-        R_pde = compute_pde_residual_kirchhoff(
-            theta=theta_phys,
+        # Compute PDE residual in Physical space (Conservative Finite-Volume matching solver.py)
+        R_pde = compute_pde_residual_physical(
             T=T_pred,
             Q_vol=Q_vol,
             kx_base=kx_base,
             ky_base=ky_base,
+            n_map=n_map,
             h_sink=h_sink,
             T_ambient=T_ambient,
+            T_ref=T_ref,
             d_chip=d_chip,
         )
 
@@ -199,8 +200,10 @@ class PhysicsInformedFNO2d(nn.Module):
         R_pde = phys_out["R_pde"]
         T_pred = phys_out["T_pred"]
 
-        # Scaled PDE loss (normalized residual scale ~ 1e6 W/m^3)
-        pde_loss = torch.mean((R_pde / 1.0e6) ** 2)
+        # Scaled PDE loss over physically defined interior cells (30x30 = 900 cells)
+        # Excludes artificially zero-padded perimeter boundary cells from the MSE denominator
+        R_interior = R_pde[:, :, 1:-1, 1:-1]
+        pde_loss = torch.mean((R_interior / 1.0e6) ** 2)
 
         # 4. Boundary loss with per-sample masking and edge alignment (Defect 2 & 3 fix)
         has_bc = any(k in meta for k in (

@@ -135,8 +135,13 @@ def compute_pde_residual_physical(
     This matches the finite-volume discretization of solver.py directly, avoiding artificial
     Kirchhoff interface jumps across materials with different temperature exponents n.
 
+    The governing PDE residual is physically defined on the (H-2) x (W-2) = 30 x 30 = 900
+    interior control volumes. Perimeter boundary cells are constant-padded with 0.0 to match
+    domain tensor dimensions [B, 1, H, W]. When computing the PDE loss MSE, reduction is taken
+    strictly over the 900 interior cells (R_pde[:, :, 1:-1, 1:-1]).
+
     Returns:
-        Residual tensor R_pde [B, 1, H, W] in W/m^3.
+        Residual tensor R_pde [B, 1, H, W] in W/m^3 (interior evaluated, boundary zero-padded).
     """
     device = T.device
     Q_vol = torch.as_tensor(Q_vol, device=device, dtype=torch.float32)
@@ -172,7 +177,7 @@ def compute_pde_residual_physical(
         T_ambient = T_ambient.unsqueeze(1)
 
     # Temperature-dependent conductivities matching solver.py Picard evaluation
-    ratio = torch.clamp(T / T_ref, min=0.5, max=3.0)
+    ratio = torch.clamp(T / T_ref, min=0.4, max=3.0)
     kx = kx_base * torch.pow(ratio, -n_map)
     ky = ky_base * torch.pow(ratio, -n_map)
 

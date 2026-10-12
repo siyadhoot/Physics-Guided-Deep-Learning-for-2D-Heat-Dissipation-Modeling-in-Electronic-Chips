@@ -1,0 +1,101 @@
+{
+  "status": "SUCCESS",
+  "timestamp_utc": "2026-10-12T16:02:35Z",
+  "config": {
+    "seed": 42,
+    "batch_size": 16,
+    "epochs": 10,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "w_data": 1.0,
+    "w_pde": 2e-05,
+    "w_bc": 0.005,
+    "n_train_samples": 256,
+    "n_val_samples": 800,
+    "residual_type": "physical_finite_volume"
+  },
+  "training_time_sec": 160.0761902332306,
+  "best_epoch": 10,
+  "best_val_loss": 2.6204587626457214,
+  "predictive_metrics": {
+    "mae_k": 20.7619571685791,
+    "rmse_k": 33.90243148803711,
+    "bias_k": -8.802692413330078,
+    "max_abs_err_k": 177.85076904296875,
+    "r2": -0.07010269165039062,
+    "hotspot_mae_k": 36.88433837890625,
+    "loc_dist_mean": 8.965165613927773,
+    "loc_dist_median": 4.47213595499958,
+    "exact_match_rate_pct": 2.125,
+    "tol_1_match_rate_pct": 9.75,
+    "best_epoch": 10,
+    "best_val_loss": 2.6204587626457214
+  },
+  "physical_residual_metrics_MW_m3": {
+    "all_interior": {
+      "mean": 154.71527099609375,
+      "rmse": 246.65757751464844,
+      "p95": 509.5377502441406
+    },
+    "homogeneous": {
+      "mean": 112.79813385009766,
+      "rmse": 182.19786071777344,
+      "p95": 344.9642639160156
+    },
+    "interfaces": {
+      "mean": 202.134765625,
+      "rmse": 303.5006408691406,
+      "p95": 632.8631591796875
+    },
+    "hotspots": {
+      "mean": 567.4009399414062,
+      "rmse": 716.3427734375
+    }
+  },
+  "temperature_ranges": {
+    "pred_min": 316.57330322265625,
+    "pred_max": 322.1315002441406,
+    "gt_min": 295.0652770996094,
+    "gt_max": 497.91241455078125
+  },
+  "comparison_benchmark": {
+    "fno_baseline": {
+      "mae_k": 3.6514,
+      "rmse_k": 7.5698,
+      "bias_k": 0.0682,
+      "r2": 0.9467,
+      "hotspot_mae_k": 11.23,
+      "loc_dist_mean": 1.25
+    },
+    "historical_pinn_epoch91": {
+      "mae_k": 10.57,
+      "rmse_k": 14.74,
+      "bias_k": -8.91,
+      "r2": 0.7977,
+      "hotspot_mae_k": 34.32,
+      "loc_dist_mean": 9.66
+    },
+    "previous_corrected_pilot_kirchhoff": {
+      "mae_k": 16.4023,
+      "rmse_k": 29.0416,
+      "bias_k": -11.6896,
+      "r2": 0.2148,
+      "hotspot_mae_k": 37.377,
+      "loc_dist_mean": 6.1464
+    },
+    "new_physical_pilot": {
+      "mae_k": 20.7619571685791,
+      "rmse_k": 33.90243148803711,
+      "bias_k": -8.802692413330078,
+      "max_abs_err_k": 177.85076904296875,
+      "r2": -0.07010269165039062,
+      "hotspot_mae_k": 36.88433837890625,
+      "loc_dist_mean": 8.965165613927773,
+      "loc_dist_median": 4.47213595499958,
+      "exact_match_rate_pct": 2.125,
+      "tol_1_match_rate_pct": 9.75,
+      "best_epoch": 10,
+      "best_val_loss": 2.6204587626457214
+    }
+  }
+}
