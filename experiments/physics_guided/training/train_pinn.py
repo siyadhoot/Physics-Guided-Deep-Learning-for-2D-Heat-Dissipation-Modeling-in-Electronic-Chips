@@ -23,7 +23,7 @@ import random
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -72,18 +72,32 @@ def custom_collate(batch):
     """Custom collate function preserving physics metadata required for PDE calculations."""
     X = torch.stack([item[0] for item in batch])
     y = torch.stack([item[1] for item in batch])
+    first = batch[0][2]
     meta = {
         "material": np.stack([item[2]["material"] for item in batch]),
-        "n_dielectric": [item[2]["n_dielectric"] for item in batch],
-        "n_silicon": [item[2]["n_silicon"] for item in batch],
-        "n_copper": [item[2]["n_copper"] for item in batch],
-        "T_ref_K": [item[2]["T_ref_K"] for item in batch],
-        "h_sink": np.array([item[2]["h_sink"] for item in batch]),
-        "T_ambient": np.array([item[2]["T_ambient"] for item in batch]),
+        "n_dielectric": np.array([item[2]["n_dielectric"] for item in batch], dtype=np.float32),
+        "n_silicon": np.array([item[2]["n_silicon"] for item in batch], dtype=np.float32),
+        "n_copper": np.array([item[2]["n_copper"] for item in batch], dtype=np.float32),
+        "T_ref_K": np.array([item[2]["T_ref_K"] for item in batch], dtype=np.float32),
+        "h_sink": np.array([item[2]["h_sink"] for item in batch], dtype=np.float32),
+        "T_ambient": np.array([item[2]["T_ambient"] for item in batch], dtype=np.float32),
         "kx_base": np.stack([item[2]["kx_base"] for item in batch]),
         "ky_base": np.stack([item[2]["ky_base"] for item in batch]),
         "sample_id": [item[2]["sample_id"] for item in batch],
+        "boundary_type": [item[2]["boundary_type"] for item in batch],
     }
+    if "Q_areal" in first:
+        meta["Q_areal"] = np.stack([item[2]["Q_areal"] for item in batch])
+    for edge in ("x0", "x1", "y0", "y1"):
+        if f"bc_type_{edge}" in first:
+            meta[f"bc_type_{edge}"] = np.array([item[2][f"bc_type_{edge}"] for item in batch], dtype=np.float32)
+            meta[f"bc_h_{edge}"] = np.array([item[2][f"bc_h_{edge}"] for item in batch], dtype=np.float32)
+            meta[f"bc_T_{edge}"] = np.array([item[2][f"bc_T_{edge}"] for item in batch], dtype=np.float32)
+    for edge_alias, edge_key in [("left", "x0"), ("right", "x1"), ("bottom", "y0"), ("top", "y1")]:
+        if f"bc_type_{edge_key}" in meta:
+            meta[f"bc_type_{edge_alias}"] = meta[f"bc_type_{edge_key}"]
+            meta[f"bc_h_{edge_alias}"] = meta[f"bc_h_{edge_key}"]
+            meta[f"bc_T_{edge_alias}"] = meta[f"bc_T_{edge_key}"]
     return X, y, meta
 
 
@@ -245,6 +259,7 @@ def save_checkpoint(
     best_val_loss: float,
     cfg: dict,
     history: list,
+    norm_stats: Optional[dict] = None,
 ) -> None:
     """Save model checkpoint safely."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -257,21 +272,25 @@ def save_checkpoint(
         "config": cfg,
         "history": history,
         "n_parameters": model.count_parameters(trainable_only=True),
+        "norm_stats": norm_stats,
     }
     torch.save(payload, path)
 
 
 def train_pinn(
     seed: int = 42,
-    batch_size: int = 8,
+    batch_size: int = 16,
     epochs: int = 100,
     lr: float = 0.001,
     weight_decay: float = 0.0001,
     patience: int = 15,
     min_delta: float = 1e-6,
     w_data: float = 1.0,
-    w_pde: float = 1e-4,
-    w_bc: float = 1e-2,
+    w_pde: float = 2e-5,
+    w_bc: float = 5e-3,
+    ckpt_dir: Optional[Union[str, Path]] = None,
+    results_dir: Optional[Union[str, Path]] = None,
+    n_train_samples: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Execute full production PINN training pipeline."""
     start_total_time = time.time()
@@ -291,6 +310,8 @@ def train_pinn(
     # 1. Load Data (TRAIN & VALIDATION ONLY - TEST SET IS LOCKED)
     train_ds = ChipThermalDataset("train", normalize=True, return_meta=True)
     val_ds = ChipThermalDataset("validation", normalize=True, return_meta=True)
+    if n_train_samples is not None:
+        train_ds = torch.utils.data.Subset(train_ds, range(n_train_samples))
     stats = load_ml_norm_stats()
 
     tstats = stats["target"]["theta"]
@@ -343,15 +364,23 @@ def train_pinn(
     scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
     early_stopping = EarlyStopping(patience=patience, min_delta=min_delta)
 
-    # 4. Checkpoint & Results Paths
-    ckpt_dir = PROJECT_ROOT / "experiments" / "physics_guided" / "checkpoints"
-    results_dir = PROJECT_ROOT / "experiments" / "physics_guided" / "results"
+    # 4. Checkpoint & Results Paths (Dedicated Production Directories)
+    if ckpt_dir is None:
+        ckpt_dir = PROJECT_ROOT / "experiments" / "physics_guided" / "checkpoints" / "pinn_production_run"
+    else:
+        ckpt_dir = Path(ckpt_dir)
+
+    if results_dir is None:
+        results_dir = PROJECT_ROOT / "outputs" / "pinn_production_run"
+    else:
+        results_dir = Path(results_dir)
+
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    best_ckpt_path = ckpt_dir / "pinn_best.pt"
-    last_ckpt_path = ckpt_dir / "pinn_last.pt"
-    history_json_path = results_dir / "pinn_training_history.json"
+    best_ckpt_path = ckpt_dir / "pinn_production_best.pt"
+    last_ckpt_path = ckpt_dir / "pinn_production_last.pt"
+    history_json_path = results_dir / "pinn_production_history.json"
 
     cfg = {
         "seed": seed,
@@ -432,13 +461,13 @@ def train_pinn(
             f"LR: {current_lr:.3e} ({epoch_time:.1f}s)"
         )
 
-        save_checkpoint(last_ckpt_path, model, optimizer, scheduler, epoch, best_val_loss, cfg, history)
+        save_checkpoint(last_ckpt_path, model, optimizer, scheduler, epoch, best_val_loss, cfg, history, norm_stats=stats)
 
         improved = early_stopping.step(val_tot)
         if improved:
             best_val_loss = val_tot
             best_epoch = epoch
-            save_checkpoint(best_ckpt_path, model, optimizer, scheduler, epoch, best_val_loss, cfg, history)
+            save_checkpoint(best_ckpt_path, model, optimizer, scheduler, epoch, best_val_loss, cfg, history, norm_stats=stats)
             print(f"  -> New best checkpoint: {best_ckpt_path} (val_total_loss={best_val_loss:.6e})")
 
         # Save history JSON per epoch
@@ -475,9 +504,43 @@ def train_pinn(
     }
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments for production PINN training."""
+    parser = argparse.ArgumentParser(description="Full Production Training for PhysicsInformedFNO2d.")
+    parser.add_argument("--epochs", type=int, default=100, help="Maximum epochs (default: 100)")
+    parser.add_argument("--batch-size", type=int, default=16, help="Batch size (default: 16)")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate (default: 1e-3)")
+    parser.add_argument("--weight-decay", type=float, default=1e-4, help="Weight decay (default: 1e-4)")
+    parser.add_argument("--patience", type=int, default=15, help="Early stopping patience (default: 15)")
+    parser.add_argument("--min-delta", type=float, default=1e-6, help="Early stopping min delta (default: 1e-6)")
+    parser.add_argument("--w-data", type=float, default=1.0, help="Data loss weight (default: 1.0)")
+    parser.add_argument("--w-pde", type=float, default=2e-5, help="PDE loss weight (default: 2e-5)")
+    parser.add_argument("--w-bc", type=float, default=5e-3, help="BC loss weight (default: 5e-3)")
+    parser.add_argument("--ckpt-dir", type=str, default=None, help="Directory to save checkpoints")
+    parser.add_argument("--results-dir", type=str, default=None, help="Directory to save results and history")
+    parser.add_argument("--n-train-samples", type=int, default=None, help="Subset of training samples (default: None = all 6400)")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42)")
+    return parser.parse_args()
+
+
 def main():
     """Main entrypoint for running PINN training."""
-    train_pinn()
+    args = parse_args()
+    train_pinn(
+        seed=args.seed,
+        batch_size=args.batch_size,
+        epochs=args.epochs,
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        patience=args.patience,
+        min_delta=args.min_delta,
+        w_data=args.w_data,
+        w_pde=args.w_pde,
+        w_bc=args.w_bc,
+        ckpt_dir=args.ckpt_dir,
+        results_dir=args.results_dir,
+        n_train_samples=args.n_train_samples,
+    )
 
 
 if __name__ == "__main__":

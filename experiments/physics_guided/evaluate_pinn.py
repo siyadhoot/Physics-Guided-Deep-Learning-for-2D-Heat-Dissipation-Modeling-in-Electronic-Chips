@@ -116,19 +116,32 @@ def custom_collate(batch):
     """Custom collate preserving metadata for PDE residual and boundary evaluation."""
     X = torch.stack([item[0] for item in batch])
     y = torch.stack([item[1] for item in batch])
+    first = batch[0][2]
     meta = {
         "material": np.stack([item[2]["material"] for item in batch]),
-        "n_dielectric": [item[2]["n_dielectric"] for item in batch],
-        "n_silicon": [item[2]["n_silicon"] for item in batch],
-        "n_copper": [item[2]["n_copper"] for item in batch],
-        "T_ref_K": [item[2]["T_ref_K"] for item in batch],
-        "h_sink": np.array([item[2]["h_sink"] for item in batch]),
-        "T_ambient": np.array([item[2]["T_ambient"] for item in batch]),
+        "n_dielectric": np.array([item[2]["n_dielectric"] for item in batch], dtype=np.float32),
+        "n_silicon": np.array([item[2]["n_silicon"] for item in batch], dtype=np.float32),
+        "n_copper": np.array([item[2]["n_copper"] for item in batch], dtype=np.float32),
+        "T_ref_K": np.array([item[2]["T_ref_K"] for item in batch], dtype=np.float32),
+        "h_sink": np.array([item[2]["h_sink"] for item in batch], dtype=np.float32),
+        "T_ambient": np.array([item[2]["T_ambient"] for item in batch], dtype=np.float32),
         "kx_base": np.stack([item[2]["kx_base"] for item in batch]),
         "ky_base": np.stack([item[2]["ky_base"] for item in batch]),
         "sample_id": [item[2]["sample_id"] for item in batch],
         "boundary_type": [item[2]["boundary_type"] for item in batch],
     }
+    if "Q_areal" in first:
+        meta["Q_areal"] = np.stack([item[2]["Q_areal"] for item in batch])
+    for edge in ("x0", "x1", "y0", "y1"):
+        if f"bc_type_{edge}" in first:
+            meta[f"bc_type_{edge}"] = np.array([item[2][f"bc_type_{edge}"] for item in batch], dtype=np.float32)
+            meta[f"bc_h_{edge}"] = np.array([item[2][f"bc_h_{edge}"] for item in batch], dtype=np.float32)
+            meta[f"bc_T_{edge}"] = np.array([item[2][f"bc_T_{edge}"] for item in batch], dtype=np.float32)
+    for edge_alias, edge_key in [("left", "x0"), ("right", "x1"), ("bottom", "y0"), ("top", "y1")]:
+        if f"bc_type_{edge_key}" in meta:
+            meta[f"bc_type_{edge_alias}"] = meta[f"bc_type_{edge_key}"]
+            meta[f"bc_h_{edge_alias}"] = meta[f"bc_h_{edge_key}"]
+            meta[f"bc_T_{edge_alias}"] = meta[f"bc_T_{edge_key}"]
     return X, y, meta
 
 

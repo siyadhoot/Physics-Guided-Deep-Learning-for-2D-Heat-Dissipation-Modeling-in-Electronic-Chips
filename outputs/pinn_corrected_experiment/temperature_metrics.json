@@ -1,0 +1,40 @@
+{
+  "n_samples": 800,
+  "n_pixels_evaluated": 819200,
+  "units": "Kelvin (differences identical in Celsius)",
+  "pinn": {
+    "mae_kelvin": 16.402310947915158,
+    "rmse_kelvin": 29.041620581773444,
+    "bias_mean_signed_error_kelvin": -11.689551404310336,
+    "max_absolute_error_kelvin": 174.95056276841933,
+    "mean_relative_error_ratio": 0.044733712461679336,
+    "mean_relative_error_pct": 4.473371246167933,
+    "max_relative_error_ratio": 0.35735083479158375,
+    "max_relative_error_pct": 35.73508347915838,
+    "r2_score": 0.21475447885850796,
+    "temperature_true_min_K": 295.0652770996094,
+    "temperature_true_max_K": 497.91241455078125,
+    "temperature_true_mean_K": 328.2160534993559,
+    "temperature_pred_min_K": 297.25178810778027,
+    "temperature_pred_max_K": 349.56923518969313,
+    "temperature_pred_mean_K": 316.5265020950456,
+    "temperature_true_min_degC": 21.915277099609398,
+    "temperature_true_max_degC": 224.76241455078127,
+    "temperature_pred_min_degC": 24.101788107780294,
+    "temperature_pred_max_degC": 76.41923518969315
+  },
+  "baseline_fno": {
+    "mae_kelvin": 3.6513919773214956,
+    "rmse_kelvin": 7.569813465166685,
+    "bias_mean_signed_error_kelvin": 0.07491951747270278,
+    "max_absolute_error_kelvin": 109.33940308570709,
+    "mean_relative_error_pct": 1.01343642269153,
+    "r2_score": 0.9466500362008651
+  },
+  "relative_improvement_pct": {
+    "mae_improvement_pct": -349.20707088662635,
+    "rmse_improvement_pct": -283.6504124627589,
+    "max_err_improvement_pct": -60.00687568349179,
+    "interpretation": "Positive % indicates PINN error reduction; Negative % indicates Baseline FNO had lower error."
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "n_samples": 800,
+  "hotspot_definition": {
+    "peak_temperature": "max_{(x,y)} T(x,y)",
+    "thermal_rise_region_threshold": "T >= T_ambient + 0.9 * (T_max - T_ambient) [top 10% temperature rise]",
+    "percentile_region_threshold": "95th percentile temperature within sample"
+  },
+  "pinn": {
+    "hotspot_temperature_error_K": {
+      "mean": 37.377005552160284,
+      "median": 26.15564303811564,
+      "std": 34.90844329587265,
+      "min": 0.027206633442858674,
+      "max": 174.94831350407117,
+      "percentile_90": 92.08664930005563,
+      "percentile_95": 112.04925227888451
+    },
+    "hotspot_localization_distance_cells": {
+      "mean": 6.146443020932102,
+      "median": 3.1622776601683795,
+      "std": 6.565819689150401,
+      "min": 0.0,
+      "max": 33.83784863137726,
+      "exact_cell_match_pct": 5.25,
+      "within_1_cell_pct": 16.375,
+      "within_2_cells_pct": 31.0,
+      "within_3_cells_pct": 46.625
+    },
+    "hotspot_localization_distance_mm": {
+      "mean_mm": 1.920763444041282,
+      "median_mm": 0.9882117688026187,
+      "max_mm": 10.574327697305396
+    },
+    "hotspot_region_overlap_iou": {
+      "mean_iou_thermal_rise_threshold": 0.09708131748971274,
+      "mean_iou_percentile_95": 0.3372089272322881
+    }
+  },
+  "baseline_fno": {
+    "hotspot_temperature_error_mean_K": 6.926083672179925,
+    "hotspot_temperature_error_median_K": 4.035334614604011,
+    "hotspot_temperature_error_max_K": 55.471966932675514,
+    "hotspot_loc_dist_mean_cells": 2.860733724996229,
+    "hotspot_loc_dist_median_cells": 1.0,
+    "exact_cell_match_pct": 35.875,
+    "within_1_cell_pct": 63.87500000000001,
+    "within_2_cells_pct": 75.375
+  },
+  "relative_improvement_pct": {
+    "hotspot_temp_error_improvement_pct": -439.6557032987185,
+    "hotspot_loc_dist_improvement_pct": -114.85547456676359
+  }
+}

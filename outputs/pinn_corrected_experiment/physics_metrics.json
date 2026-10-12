@@ -1,0 +1,29 @@
+{
+  "pde_equation": "d/dx(kx d_theta/dx) + d/dy(ky d_theta/dy) - (h_sink/d_chip)*(T - T_ambient) + Q_vol = 0",
+  "space": "Kirchhoff transformation potential theta [K]",
+  "domain_interior_cells": "30x30 cells per sample (boundaries padded to zero)",
+  "pinn": {
+    "physical_residual_W_m3": {
+      "mean_absolute_residual": 91869408.46353264,
+      "rmse_residual": 181267072.23888943,
+      "max_absolute_residual": 3640801280.0,
+      "median_absolute_residual": 41709858.0
+    },
+    "physical_residual_MW_m3": {
+      "mean_absolute_residual": 91.86940846353264,
+      "rmse_residual": 181.26707223888943,
+      "max_absolute_residual": 3640.80128
+    },
+    "training_scaled_residual_norm": {
+      "mean_absolute_residual": 91869405.77977274,
+      "rmse_residual": 181267063.48303866,
+      "max_absolute_residual": 3640801280.0,
+      "training_pde_loss_reproduced": 28878.88034510506
+    }
+  },
+  "ground_truth_solver_residual_comparison": {
+    "mean_solver_residual_from_metadata": 5.209111054109771e-09,
+    "max_solver_residual_from_metadata": 7.214223528148367e-07,
+    "note": "Ground truth finite-volume solver residual is evaluated after Picard iteration convergence."
+  }
+}

@@ -29,7 +29,7 @@ import torch.nn as nn
 from src.models.fno import FNO2d
 from src.physics.boundary import compute_boundary_residual_torch
 from src.physics.kirchhoff_torch import inverse_kirchhoff_torch
-from src.physics.pde_residual import compute_pde_residual_kirchhoff
+from src.physics.pde_residual import compute_pde_residual_kirchhoff, compute_pde_residual_physical
 
 
 class PhysicsInformedFNO2d(nn.Module):
@@ -106,44 +106,54 @@ class PhysicsInformedFNO2d(nn.Module):
         if material_t.ndim == 2:
             material_t = material_t.unsqueeze(0)
 
-        # Build n_map tensor
-        n_d = float(np.mean(meta["n_dielectric"])) if isinstance(meta["n_dielectric"], (np.ndarray, list)) else float(meta["n_dielectric"])
-        n_s = float(np.mean(meta["n_silicon"])) if isinstance(meta["n_silicon"], (np.ndarray, list)) else float(meta["n_silicon"])
-        n_c = float(np.mean(meta["n_copper"])) if isinstance(meta["n_copper"], (np.ndarray, list)) else float(meta["n_copper"])
-        T_ref = float(np.mean(meta["T_ref_K"])) if isinstance(meta["T_ref_K"], (np.ndarray, list)) else float(meta["T_ref_K"])
+        # Build vectorized n_map tensor per-sample on device (Defect 4 fix)
+        nd = torch.as_tensor(meta["n_dielectric"], device=device, dtype=torch.float32).view(-1, 1, 1)
+        ns = torch.as_tensor(meta["n_silicon"], device=device, dtype=torch.float32).view(-1, 1, 1)
+        nc = torch.as_tensor(meta["n_copper"], device=device, dtype=torch.float32).view(-1, 1, 1)
+        if "T_ref_K" in meta:
+            T_ref_val = meta["T_ref_K"]
+            T_ref = float(T_ref_val) if isinstance(T_ref_val, (int, float)) else float(np.mean(T_ref_val))
+        else:
+            T_ref = 300.0
 
-        n_map = torch.zeros_like(material_t, dtype=torch.float32)
-        n_map[material_t == 0] = n_d
-        n_map[material_t == 1] = n_s
-        n_map[material_t == 2] = n_c
+        n_map = torch.where(material_t == 0, nd, torch.where(material_t == 1, ns, nc))
 
         # Inverse Kirchhoff transform to physical temperature T_pred [K]
         T_pred = inverse_kirchhoff_torch(theta_phys, n_map.unsqueeze(1), T_ref=T_ref)
 
         # Physical conductivity channels kx_base, ky_base from meta / X
         if "kx_base" in meta:
-            kx_base = torch.from_numpy(np.asarray(meta["kx_base"])).to(device, dtype=torch.float32)
+            kx_base = torch.as_tensor(meta["kx_base"], device=device, dtype=torch.float32)
         else:
             kx_base = X[:, 2:3]
 
         if "ky_base" in meta:
-            ky_base = torch.from_numpy(np.asarray(meta["ky_base"])).to(device, dtype=torch.float32)
+            ky_base = torch.as_tensor(meta["ky_base"], device=device, dtype=torch.float32)
         else:
             ky_base = X[:, 3:4]
 
         while kx_base.ndim < 4:
-            kx_base = kx_base.unsqueeze(0)
+            kx_base = kx_base.unsqueeze(0 if kx_base.ndim == 2 else 1)
         while ky_base.ndim < 4:
-            ky_base = ky_base.unsqueeze(0)
+            ky_base = ky_base.unsqueeze(0 if ky_base.ndim == 2 else 1)
 
-        # Volumetric power Q_vol [W/m^3] = Q_areal [W/m^2] / d_chip (0.5mm)
-        # Q channel is index 0
-        Q_areal = X[:, 0:1]  # or from meta
+        # Volumetric power Q_vol [W/m^3] = Q_areal [W/m^2] / d_chip (0.5mm) (Defect 1 fix)
         d_chip = 5.0e-4
-        Q_vol = Q_areal * 1.0e4 / d_chip  # W/m^3 scale
+        if "Q_areal" in meta:
+            Q_areal = torch.as_tensor(meta["Q_areal"], device=device, dtype=torch.float32)
+            while Q_areal.ndim < 4:
+                Q_areal = Q_areal.unsqueeze(1)
+        else:
+            # Denormalize input channel 0 using dataset stats (mean=45038.5, std=97418.0)
+            # Physical Q_areal is non-negative
+            Q_mean = 45038.5
+            Q_std = 97418.0
+            Q_areal = torch.clamp(X[:, 0:1] * Q_std + Q_mean, min=0.0)
 
-        h_sink = torch.tensor(meta["h_sink"], device=device, dtype=torch.float32) if "h_sink" in meta else torch.tensor(1000.0, device=device)
-        T_ambient = torch.tensor(meta["T_ambient"], device=device, dtype=torch.float32) if "T_ambient" in meta else torch.tensor(300.0, device=device)
+        Q_vol = Q_areal / d_chip
+
+        h_sink = torch.as_tensor(meta.get("h_sink", 1000.0), device=device, dtype=torch.float32)
+        T_ambient = torch.as_tensor(meta.get("T_ambient", 300.0), device=device, dtype=torch.float32)
 
         # Compute PDE residual in Kirchhoff space
         R_pde = compute_pde_residual_kirchhoff(
@@ -154,6 +164,7 @@ class PhysicsInformedFNO2d(nn.Module):
             ky_base=ky_base,
             h_sink=h_sink,
             T_ambient=T_ambient,
+            d_chip=d_chip,
         )
 
         return {
@@ -161,6 +172,9 @@ class PhysicsInformedFNO2d(nn.Module):
             "T_pred": T_pred,
             "R_pde": R_pde,
             "n_map": n_map,
+            "Q_vol": Q_vol,
+            "kx_base": kx_base,
+            "ky_base": ky_base,
         }
 
     def compute_all_losses(
@@ -188,25 +202,31 @@ class PhysicsInformedFNO2d(nn.Module):
         # Scaled PDE loss (normalized residual scale ~ 1e6 W/m^3)
         pde_loss = torch.mean((R_pde / 1.0e6) ** 2)
 
-        # Boundary loss
-        bc_loss = torch.tensor(0.0, device=X.device)
-        if "bc_T_left" in meta:
+        # 4. Boundary loss with per-sample masking and edge alignment (Defect 2 & 3 fix)
+        has_bc = any(k in meta for k in (
+            "bc_type_left", "bc_type_x0", "bc_T_left", "bc_T_x0"
+        ))
+        if has_bc:
             bc_loss = compute_boundary_residual_torch(
                 theta_pred=phys_out["theta_phys"],
                 T_pred=T_pred,
-                bc_type_left=torch.tensor(meta["bc_type_left"], device=X.device) if "bc_type_left" in meta else torch.tensor(0),
-                bc_type_right=torch.tensor(meta["bc_type_right"], device=X.device) if "bc_type_right" in meta else torch.tensor(0),
-                bc_type_bottom=torch.tensor(meta["bc_type_bottom"], device=X.device) if "bc_type_bottom" in meta else torch.tensor(0),
-                bc_type_top=torch.tensor(meta["bc_type_top"], device=X.device) if "bc_type_top" in meta else torch.tensor(0),
-                bc_h_left=torch.tensor(meta.get("bc_h_left", 0.0), device=X.device),
-                bc_h_right=torch.tensor(meta.get("bc_h_right", 0.0), device=X.device),
-                bc_h_bottom=torch.tensor(meta.get("bc_h_bottom", 0.0), device=X.device),
-                bc_h_top=torch.tensor(meta.get("bc_h_top", 0.0), device=X.device),
-                bc_T_left=torch.tensor(meta.get("bc_T_left", 0.0), device=X.device),
-                bc_T_right=torch.tensor(meta.get("bc_T_right", 0.0), device=X.device),
-                bc_T_bottom=torch.tensor(meta.get("bc_T_bottom", 0.0), device=X.device),
-                bc_T_top=torch.tensor(meta.get("bc_T_top", 0.0), device=X.device),
+                bc_type_left=meta.get("bc_type_left", meta.get("bc_type_x0")),
+                bc_type_right=meta.get("bc_type_right", meta.get("bc_type_x1")),
+                bc_type_bottom=meta.get("bc_type_bottom", meta.get("bc_type_y0")),
+                bc_type_top=meta.get("bc_type_top", meta.get("bc_type_y1")),
+                bc_h_left=meta.get("bc_h_left", meta.get("bc_h_x0")),
+                bc_h_right=meta.get("bc_h_right", meta.get("bc_h_x1")),
+                bc_h_bottom=meta.get("bc_h_bottom", meta.get("bc_h_y0")),
+                bc_h_top=meta.get("bc_h_top", meta.get("bc_h_y1")),
+                bc_T_left=meta.get("bc_T_left", meta.get("bc_T_x0")),
+                bc_T_right=meta.get("bc_T_right", meta.get("bc_T_x1")),
+                bc_T_bottom=meta.get("bc_T_bottom", meta.get("bc_T_y0")),
+                bc_T_top=meta.get("bc_T_top", meta.get("bc_T_y1")),
+                kx_base=phys_out["kx_base"],
+                ky_base=phys_out["ky_base"],
             )
+        else:
+            bc_loss = 0.0 * T_pred.sum()
 
         total_loss = self.w_data * data_loss + self.w_pde * pde_loss + self.w_bc * bc_loss
 
@@ -219,4 +239,5 @@ class PhysicsInformedFNO2d(nn.Module):
             "T_pred": T_pred,
             "R_pde": R_pde,
             "n_map": phys_out["n_map"],
+            "Q_vol": phys_out["Q_vol"],
         }
