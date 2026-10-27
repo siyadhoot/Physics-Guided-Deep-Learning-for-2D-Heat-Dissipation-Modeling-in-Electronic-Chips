@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import random
 import sys
 import time
@@ -135,7 +136,7 @@ def evaluate_validation_set(
     all_gt_T: Optional[np.ndarray] = None,
     w_data: float = 1.0,
     w_pde: float = 6.0e-11,
-    w_bc: float = 1.35e-5,
+    w_bc: float = 6.0e-11,
 ) -> Dict[str, Any]:
     """
     Evaluate complete validation dataset across loss components and physical temperature metrics.
@@ -208,6 +209,9 @@ def evaluate_validation_set(
         "val_data_loss": v_data_mean,
         "val_pde_loss": v_pde_mean,
         "val_bc_loss": v_bc_mean,
+        "val_weighted_data_loss": w_data * v_data_mean,
+        "val_weighted_pde_loss": w_pde * v_pde_mean,
+        "val_weighted_bc_loss": w_bc * v_bc_mean,
         "val_total_loss": v_total_mean,
         "pred_t_min": pred_t_min,
         "pred_t_max": pred_t_max,
@@ -262,12 +266,38 @@ def evaluate_validation_set(
         exact_rate = float(exact_matches / n_eval * 100.0)
         tol_1_rate = float(tol_1_matches / n_eval * 100.0)
 
+        # Boundary-only and Interior-only error metrics
+        boundary_mask = np.zeros((32, 32), dtype=bool)
+        boundary_mask[0, :] = True
+        boundary_mask[-1, :] = True
+        boundary_mask[:, 0] = True
+        boundary_mask[:, -1] = True
+        interior_mask = ~boundary_mask
+
+        boundary_mae_k = float(np.mean(abs_err[:, boundary_mask]))
+        boundary_rmse_k = float(np.sqrt(np.mean(err[:, boundary_mask]**2)))
+        interior_mae_k = float(np.mean(abs_err[:, interior_mask]))
+        interior_rmse_k = float(np.sqrt(np.mean(err[:, interior_mask]**2)))
+
+        edge_x0_mae_k = float(np.mean(abs_err[:, 0, :]))
+        edge_x1_mae_k = float(np.mean(abs_err[:, -1, :]))
+        edge_y0_mae_k = float(np.mean(abs_err[:, :, 0]))
+        edge_y1_mae_k = float(np.mean(abs_err[:, :, -1]))
+
         results.update({
             "mae_k": mae_k,
             "rmse_k": rmse_k,
             "bias_k": bias_k,
             "max_abs_err_k": max_abs_err_k,
             "r2_score": r2_score,
+            "boundary_mae_k": boundary_mae_k,
+            "boundary_rmse_k": boundary_rmse_k,
+            "interior_mae_k": interior_mae_k,
+            "interior_rmse_k": interior_rmse_k,
+            "edge_x0_mae_k": edge_x0_mae_k,
+            "edge_x1_mae_k": edge_x1_mae_k,
+            "edge_y0_mae_k": edge_y0_mae_k,
+            "edge_y1_mae_k": edge_y1_mae_k,
             "gt_t_min": gt_t_min,
             "gt_t_max": gt_t_max,
             "gt_t_span": gt_t_span,
@@ -279,6 +309,19 @@ def evaluate_validation_set(
         })
 
     return results
+
+
+def compute_param_grad_norm(model: torch.nn.Module) -> float:
+    """Compute Euclidean norm of gradients across all parameters, supporting complex tensors."""
+    total_sq = 0.0
+    for p in model.parameters():
+        if p.grad is not None:
+            g = p.grad
+            if g.is_complex():
+                total_sq += torch.sum(torch.abs(g) ** 2).item()
+            else:
+                total_sq += torch.sum(g ** 2).item()
+    return math.sqrt(total_sq)
 
 
 def train_one_epoch(
@@ -298,14 +341,27 @@ def train_one_epoch(
     running_bc_loss = 0.0
     running_total_loss = 0.0
     n_samples = 0
+    non_finite_steps = 0
+    skipped_steps = 0
+
+    # Diagnostic gradient norms measured on step 1 representative batch
+    grad_norm_data_raw = 0.0
+    grad_norm_data_weighted = 0.0
+    grad_norm_pde_raw = 0.0
+    grad_norm_pde_weighted = 0.0
+    grad_norm_bc_raw = 0.0
+    grad_norm_bc_weighted = 0.0
+    grad_norm_total = 0.0
 
     for step, (X, y, meta) in enumerate(loader, start=1):
         X = X.to(device, non_blocking=True)
         y = y.to(device, non_blocking=True)
 
         if not torch.isfinite(X).all():
+            non_finite_steps += 1
             raise RuntimeError(f"CRITICAL: Non-finite input X at epoch {epoch}, step {step}")
         if not torch.isfinite(y).all():
+            non_finite_steps += 1
             raise RuntimeError(f"CRITICAL: Non-finite target y at epoch {epoch}, step {step}")
 
         optimizer.zero_grad(set_to_none=True)
@@ -318,17 +374,46 @@ def train_one_epoch(
         tot_loss = loss_dict["total_loss"]
 
         if not torch.isfinite(tot_loss).all():
+            non_finite_steps += 1
             raise RuntimeError(f"CRITICAL: Non-finite total loss at epoch {epoch}, step {step}")
         if not torch.isfinite(d_loss).all():
+            non_finite_steps += 1
             raise RuntimeError(f"CRITICAL: Non-finite data loss at epoch {epoch}, step {step}")
         if not torch.isfinite(p_loss).all():
+            non_finite_steps += 1
             raise RuntimeError(f"CRITICAL: Non-finite PDE loss at epoch {epoch}, step {step}")
+        if not torch.isfinite(b_loss).all():
+            non_finite_steps += 1
+            raise RuntimeError(f"CRITICAL: Non-finite BC loss at epoch {epoch}, step {step}")
+
+        # On representative first batch of each epoch, measure isolated gradient norms
+        if step == 1:
+            optimizer.zero_grad(set_to_none=True)
+            d_loss.backward(retain_graph=True)
+            grad_norm_data_raw = compute_param_grad_norm(model)
+            grad_norm_data_weighted = grad_norm_data_raw * model.w_data
+
+            optimizer.zero_grad(set_to_none=True)
+            p_loss.backward(retain_graph=True)
+            grad_norm_pde_raw = compute_param_grad_norm(model)
+            grad_norm_pde_weighted = grad_norm_pde_raw * model.w_pde
+
+            optimizer.zero_grad(set_to_none=True)
+            b_loss.backward(retain_graph=True)
+            grad_norm_bc_raw = compute_param_grad_norm(model)
+            grad_norm_bc_weighted = grad_norm_bc_raw * model.w_bc
+
+            optimizer.zero_grad(set_to_none=True)
 
         tot_loss.backward()
+
+        if step == 1:
+            grad_norm_total = compute_param_grad_norm(model)
 
         # Check gradient finiteness across all parameters
         for name, param in model.named_parameters():
             if param.grad is not None and not torch.isfinite(param.grad).all():
+                non_finite_steps += 1
                 raise RuntimeError(f"CRITICAL: Non-finite gradient in {name} at epoch {epoch}, step {step}")
 
         optimizer.step()
@@ -345,15 +430,33 @@ def train_one_epoch(
                 f"  epoch {epoch:03d} step {step:04d} | "
                 f"total_loss={tot_loss.item():.6e} | "
                 f"data_loss={d_loss.item():.6e} | "
-                f"pde_loss={p_loss.item():.6e}"
+                f"pde_loss={p_loss.item():.6e} | "
+                f"bc_loss={b_loss.item():.6e}"
             )
 
     n_samples = max(n_samples, 1)
+    mean_data_loss = running_data_loss / n_samples
+    mean_pde_loss = running_pde_loss / n_samples
+    mean_bc_loss = running_bc_loss / n_samples
+    mean_total_loss = running_total_loss / n_samples
+
     return {
-        "train_data_loss": running_data_loss / n_samples,
-        "train_pde_loss": running_pde_loss / n_samples,
-        "train_bc_loss": running_bc_loss / n_samples,
-        "train_total_loss": running_total_loss / n_samples,
+        "train_data_loss": mean_data_loss,
+        "train_pde_loss": mean_pde_loss,
+        "train_bc_loss": mean_bc_loss,
+        "train_weighted_data_loss": model.w_data * mean_data_loss,
+        "train_weighted_pde_loss": model.w_pde * mean_pde_loss,
+        "train_weighted_bc_loss": model.w_bc * mean_bc_loss,
+        "train_total_loss": mean_total_loss,
+        "grad_norm_data_raw": grad_norm_data_raw,
+        "grad_norm_data_weighted": grad_norm_data_weighted,
+        "grad_norm_pde_raw": grad_norm_pde_raw,
+        "grad_norm_pde_weighted": grad_norm_pde_weighted,
+        "grad_norm_bc_raw": grad_norm_bc_raw,
+        "grad_norm_bc_weighted": grad_norm_bc_weighted,
+        "grad_norm_total": grad_norm_total,
+        "non_finite_steps": non_finite_steps,
+        "skipped_steps": skipped_steps,
     }
 
 
@@ -450,7 +553,7 @@ def train_pinn(
     min_delta: float = 1e-6,
     w_data: float = 1.0,
     w_pde: float = 6.0e-11,
-    w_bc: float = 1.35e-5,
+    w_bc: float = 6.0e-11,
     init_ckpt: Optional[Union[str, Path]] = None,
     min_global_span: Optional[float] = 100.0,
     max_val_mae: Optional[float] = 50.0,
@@ -458,6 +561,7 @@ def train_pinn(
     best_criterion: str = "val_data_loss",
     ckpt_dir: Optional[Union[str, Path]] = None,
     results_dir: Optional[Union[str, Path]] = None,
+    exp_name: str = "pinn_heat_escape",
     n_train_samples: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Execute full production PINN training pipeline."""
@@ -544,21 +648,31 @@ def train_pinn(
 
     # 4. Checkpoint & Results Paths (Dedicated Production Directories)
     if ckpt_dir is None:
-        ckpt_dir = PROJECT_ROOT / "experiments" / "physics_guided" / "checkpoints" / "pinn_full_data_v1"
+        ckpt_dir = PROJECT_ROOT / "experiments" / "physics_guided" / "checkpoints" / exp_name
     else:
         ckpt_dir = Path(ckpt_dir)
 
     if results_dir is None:
-        results_dir = PROJECT_ROOT / "outputs" / "pinn_full_data_v1"
+        results_dir = PROJECT_ROOT / "outputs" / exp_name
     else:
         results_dir = Path(results_dir)
 
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    best_ckpt_path = ckpt_dir / "pinn_full_data_best.pt"
-    last_ckpt_path = ckpt_dir / "pinn_full_data_last.pt"
-    history_json_path = results_dir / "pinn_full_data_history.json"
+    best_ckpt_path = ckpt_dir / f"{exp_name}_best.pt"
+    last_ckpt_path = ckpt_dir / f"{exp_name}_last.pt"
+    history_json_path = results_dir / f"{exp_name}_history.json"
+
+    # Absolute safeguards against overwriting protected legacy/baseline checkpoints
+    protected_checkpoints = {
+        PROJECT_ROOT / "experiments" / "physics_guided" / "checkpoints" / "pinn_best.pt",
+        PROJECT_ROOT / "experiments" / "baseline" / "checkpoints" / "baseline" / "fno_baseline_best.pt",
+        PROJECT_ROOT / "experiments" / "physics_guided" / "checkpoints" / "pinn_full_data_v1" / "pinn_full_data_best.pt",
+    }
+    for protected in protected_checkpoints:
+        if best_ckpt_path.resolve() == protected.resolve() or last_ckpt_path.resolve() == protected.resolve():
+            raise RuntimeError(f"CRITICAL SAFEGUARD: Target checkpoint path {best_ckpt_path} is protected and cannot be overwritten!")
 
     cfg = {
         "seed": seed,
@@ -645,13 +759,10 @@ def train_pinn(
 
         record = {
             "epoch": epoch,
-            "train_total_loss": train_metrics["train_total_loss"],
-            "train_data_loss": train_metrics["train_data_loss"],
-            "train_pde_loss": train_metrics["train_pde_loss"],
-            "train_bc_loss": train_metrics["train_bc_loss"],
             "learning_rate": current_lr,
             "epoch_time_sec": epoch_time,
         }
+        record.update(train_metrics)
         record.update(val_metrics)
         history.append(record)
 
@@ -680,10 +791,22 @@ def train_pinn(
 
         print(
             f"Epoch {epoch:03d}/{epochs:03d} | "
-            f"Train Tot: {train_metrics['train_total_loss']:.6e} (PDE: {train_metrics['train_pde_loss']:.4e}) | "
-            f"Val Tot: {val_metrics['val_total_loss']:.6e} (PDE: {val_metrics['val_pde_loss']:.4e}) | "
-            f"MAE: {val_mae:.2f}K | R2: {val_metrics.get('r2_score', float('nan')):.4f} | "
-            f"Span: {pred_span:.1f}K | LR: {current_lr:.3e} ({epoch_time:.1f}s)"
+            f"Train [Data: {train_metrics['train_data_loss']:.4e} (w: {train_metrics['train_weighted_data_loss']:.4e}) | "
+            f"PDE: {train_metrics['train_pde_loss']:.4e} (w: {train_metrics['train_weighted_pde_loss']:.4e}) | "
+            f"BC: {train_metrics['train_bc_loss']:.4e} (w: {train_metrics['train_weighted_bc_loss']:.4e}) | "
+            f"Tot: {train_metrics['train_total_loss']:.6e}]"
+        )
+        print(
+            f"           | Step 1 Grads (weighted): [D: {train_metrics['grad_norm_data_weighted']:.3e}, "
+            f"P: {train_metrics['grad_norm_pde_weighted']:.3e}, "
+            f"B: {train_metrics['grad_norm_bc_weighted']:.3e}, "
+            f"Tot: {train_metrics['grad_norm_total']:.3e}]"
+        )
+        print(
+            f"           | Val [Tot: {val_metrics['val_total_loss']:.6e} | "
+            f"MAE: {val_mae:.2f}K | BoundMAE: {val_metrics.get('boundary_mae_k', float('nan')):.2f}K | "
+            f"R2: {val_metrics.get('r2_score', float('nan')):.4f} | "
+            f"Span: {pred_span:.1f}K | LR: {current_lr:.3e} ({epoch_time:.1f}s)]"
         )
 
         save_checkpoint(
@@ -767,7 +890,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-delta", type=float, default=1e-6, help="Early stopping min delta (default: 1e-6)")
     parser.add_argument("--w-data", type=float, default=1.0, help="Data loss weight (default: 1.0)")
     parser.add_argument("--w-pde", type=float, default=6.0e-11, help="PDE loss weight (default: 6.0e-11)")
-    parser.add_argument("--w-bc", type=float, default=1.35e-5, help="BC loss weight (default: 1.35e-5)")
+    parser.add_argument("--w-bc", type=float, default=6.0e-11, help="BC loss weight (default: 6.0e-11)")
     parser.add_argument("--init-ckpt", type=str, default=None, help="Path to checkpoint to initialize model weights (default: None)")
     parser.add_argument("--min-global-span", type=float, default=100.0, help="Minimum validation temperature span threshold for collapse safeguard (default: 100.0 K)")
     parser.add_argument("--max-val-mae", type=float, default=50.0, help="Maximum validation MAE threshold for safeguard (default: 50.0 K)")
@@ -775,6 +898,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--best-criterion", type=str, default="val_data_loss", choices=["val_data_loss", "val_total_loss", "mae_k"], help="Metric to select best checkpoint (default: val_data_loss)")
     parser.add_argument("--ckpt-dir", type=str, default=None, help="Directory to save checkpoints")
     parser.add_argument("--results-dir", type=str, default=None, help="Directory to save results and history")
+    parser.add_argument("--exp-name", type=str, default="pinn_heat_escape", help="Experiment name for checkpoint and history files")
     parser.add_argument("--n-train-samples", type=int, default=None, help="Subset of training samples (default: None = all 6400)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42)")
     return parser.parse_args()
@@ -801,6 +925,7 @@ def main():
         best_criterion=args.best_criterion,
         ckpt_dir=args.ckpt_dir,
         results_dir=args.results_dir,
+        exp_name=args.exp_name,
         n_train_samples=args.n_train_samples,
     )
 

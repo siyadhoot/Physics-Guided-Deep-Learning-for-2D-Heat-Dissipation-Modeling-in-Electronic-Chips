@@ -54,7 +54,7 @@ class PhysicsInformedFNO2d(nn.Module):
         use_grid: bool = True,
         w_data: float = 1.0,
         w_pde: float = 6.0e-11,
-        w_bc: float = 1.35e-5,
+        w_bc: float = 6.0e-11,
     ):
         super().__init__()
         self.fno = FNO2d(
@@ -205,11 +205,18 @@ class PhysicsInformedFNO2d(nn.Module):
         R_interior = R_pde[:, :, 1:-1, 1:-1]
         pde_loss = torch.mean((R_interior / 1.0e6) ** 2)
 
-        # 4. Boundary loss with per-sample masking and edge alignment (Defect 2 & 3 fix)
+        # 4. Boundary loss with per-sample masking and edge alignment
         has_bc = any(k in meta for k in (
             "bc_type_left", "bc_type_x0", "bc_T_left", "bc_T_x0"
         ))
         if has_bc:
+            d_chip = 5.0e-4
+            if "T_ref_K" in meta:
+                T_ref_val = meta["T_ref_K"]
+                T_ref = float(T_ref_val) if isinstance(T_ref_val, (int, float)) else float(np.mean(T_ref_val))
+            else:
+                T_ref = 300.0
+
             bc_loss = compute_boundary_residual_torch(
                 theta_pred=phys_out["theta_phys"],
                 T_pred=T_pred,
@@ -227,6 +234,15 @@ class PhysicsInformedFNO2d(nn.Module):
                 bc_T_top=meta.get("bc_T_top", meta.get("bc_T_y1")),
                 kx_base=phys_out["kx_base"],
                 ky_base=phys_out["ky_base"],
+                n_map=phys_out["n_map"],
+                Q_vol=phys_out["Q_vol"],
+                h_sink=meta.get("h_sink", 1000.0),
+                T_ambient=meta.get("T_ambient", 300.0),
+                dx=3.125e-4,
+                dy=3.125e-4,
+                d_chip=d_chip,
+                T_ref=T_ref,
+                residual_scale=1.0e6,
             )
         else:
             bc_loss = 0.0 * T_pred.sum()
