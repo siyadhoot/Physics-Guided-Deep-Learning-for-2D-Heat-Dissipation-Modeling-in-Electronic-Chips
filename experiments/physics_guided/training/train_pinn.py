@@ -324,6 +324,24 @@ def compute_param_grad_norm(model: torch.nn.Module) -> float:
     return math.sqrt(total_sq)
 
 
+def component_gradient_diagnostics(loss: torch.Tensor, model: torch.nn.Module) -> Dict[str, float]:
+    """Measure a component gradient without writing to .grad or affecting optimizer updates."""
+    params = [p for p in model.parameters() if p.requires_grad]
+    grads = torch.autograd.grad(loss, params, retain_graph=True, allow_unused=True)
+    sq_norm, active, total = 0.0, 0, 0
+    for param, grad in zip(params, grads):
+        total += 1
+        if grad is not None and torch.isfinite(grad).all():
+            sq_norm += torch.sum(torch.abs(grad) ** 2).item()
+            active += int(torch.count_nonzero(grad).item() > 0)
+    return {"norm": math.sqrt(sq_norm), "active_parameters": active, "trainable_parameters": total}
+
+
+def safe_gradient_ratio(numerator: float, denominator: float, eps: float = 1e-12) -> float:
+    """Return 0 when the data gradient is effectively zero; otherwise return the ratio."""
+    return numerator / denominator if math.isfinite(denominator) and denominator > eps else 0.0
+
+
 def train_one_epoch(
     model: PhysicsInformedFNO2d,
     loader: DataLoader,
@@ -352,6 +370,9 @@ def train_one_epoch(
     grad_norm_bc_raw = 0.0
     grad_norm_bc_weighted = 0.0
     grad_norm_total = 0.0
+    bc_active_parameters = 0
+    trainable_parameters = 0
+    bc_data_gradient_ratio = 0.0
 
     for step, (X, y, meta) in enumerate(loader, start=1):
         X = X.to(device, non_blocking=True)
@@ -388,22 +409,20 @@ def train_one_epoch(
 
         # On representative first batch of each epoch, measure isolated gradient norms
         if step == 1:
-            optimizer.zero_grad(set_to_none=True)
-            d_loss.backward(retain_graph=True)
-            grad_norm_data_raw = compute_param_grad_norm(model)
+            d_diag = component_gradient_diagnostics(d_loss, model)
+            grad_norm_data_raw = d_diag["norm"]
             grad_norm_data_weighted = grad_norm_data_raw * model.w_data
 
-            optimizer.zero_grad(set_to_none=True)
-            p_loss.backward(retain_graph=True)
-            grad_norm_pde_raw = compute_param_grad_norm(model)
+            p_diag = component_gradient_diagnostics(p_loss, model)
+            grad_norm_pde_raw = p_diag["norm"]
             grad_norm_pde_weighted = grad_norm_pde_raw * model.w_pde
 
-            optimizer.zero_grad(set_to_none=True)
-            b_loss.backward(retain_graph=True)
-            grad_norm_bc_raw = compute_param_grad_norm(model)
+            b_diag = component_gradient_diagnostics(b_loss, model)
+            grad_norm_bc_raw = b_diag["norm"]
             grad_norm_bc_weighted = grad_norm_bc_raw * model.w_bc
-
-            optimizer.zero_grad(set_to_none=True)
+            bc_active_parameters = b_diag["active_parameters"]
+            trainable_parameters = b_diag["trainable_parameters"]
+            bc_data_gradient_ratio = safe_gradient_ratio(grad_norm_bc_weighted, grad_norm_data_weighted)
 
         tot_loss.backward()
 
@@ -455,6 +474,9 @@ def train_one_epoch(
         "grad_norm_bc_raw": grad_norm_bc_raw,
         "grad_norm_bc_weighted": grad_norm_bc_weighted,
         "grad_norm_total": grad_norm_total,
+        "grad_norm_bc_to_data_ratio": bc_data_gradient_ratio if step >= 1 else 0.0,
+        "bc_gradient_nonzero_parameter_count": bc_active_parameters if step >= 1 else 0,
+        "bc_gradient_parameter_coverage": (bc_active_parameters / trainable_parameters) if step >= 1 and trainable_parameters else 0.0,
         "non_finite_steps": non_finite_steps,
         "skipped_steps": skipped_steps,
     }
@@ -563,6 +585,7 @@ def train_pinn(
     results_dir: Optional[Union[str, Path]] = None,
     exp_name: str = "pinn_heat_escape",
     n_train_samples: Optional[int] = None,
+    disable_early_stopping: bool = False,
 ) -> Dict[str, Any]:
     """Execute full production PINN training pipeline."""
     start_total_time = time.time()
@@ -644,7 +667,7 @@ def train_pinn(
     # 3. Setup Optimizer & Scheduler
     optimizer = AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
-    early_stopping = EarlyStopping(patience=patience, min_delta=min_delta)
+    early_stopping = None if disable_early_stopping else EarlyStopping(patience=patience, min_delta=min_delta)
 
     # 4. Checkpoint & Results Paths (Dedicated Production Directories)
     if ckpt_dir is None:
@@ -663,6 +686,12 @@ def train_pinn(
     best_ckpt_path = ckpt_dir / f"{exp_name}_best.pt"
     last_ckpt_path = ckpt_dir / f"{exp_name}_last.pt"
     history_json_path = results_dir / f"{exp_name}_history.json"
+    existing_artifacts = [path for path in (best_ckpt_path, last_ckpt_path, history_json_path) if path.exists()]
+    if existing_artifacts:
+        raise FileExistsError(
+            "Refusing to overwrite existing training artifacts: "
+            + ", ".join(str(path) for path in existing_artifacts)
+        )
 
     # Absolute safeguards against overwriting protected legacy/baseline checkpoints
     protected_checkpoints = {
@@ -681,6 +710,7 @@ def train_pinn(
         "learning_rate": lr,
         "weight_decay": weight_decay,
         "patience": patience,
+        "early_stopping_enabled": not disable_early_stopping,
         "min_delta": min_delta,
         "w_data": w_data,
         "w_pde": w_pde,
@@ -826,7 +856,7 @@ def train_pinn(
         if best_criterion not in val_metrics:
             raise KeyError(f"Selected best_criterion '{best_criterion}' not found in validation metrics: {list(val_metrics.keys())}")
         current_metric = val_metrics[best_criterion]
-        improved = early_stopping.step(current_metric)
+        improved = (current_metric < best_val_metric - min_delta) if early_stopping is None else early_stopping.step(current_metric)
         if improved:
             best_val_metric = current_metric
             best_epoch = epoch
@@ -853,7 +883,7 @@ def train_pinn(
                 "history": history,
             }, f, indent=2)
 
-        if early_stopping.should_stop:
+        if early_stopping is not None and early_stopping.should_stop:
             print(f"\nEarly stopping triggered at epoch {epoch} (patience={early_stopping.patience})")
             break
 
@@ -901,6 +931,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--exp-name", type=str, default="pinn_heat_escape", help="Experiment name for checkpoint and history files")
     parser.add_argument("--n-train-samples", type=int, default=None, help="Subset of training samples (default: None = all 6400)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42)")
+    parser.add_argument("--disable-early-stopping", action="store_true", help="Run all requested epochs; still save lowest-val-data-loss checkpoint")
     return parser.parse_args()
 
 
@@ -927,6 +958,7 @@ def main():
         results_dir=args.results_dir,
         exp_name=args.exp_name,
         n_train_samples=args.n_train_samples,
+        disable_early_stopping=args.disable_early_stopping,
     )
 
 

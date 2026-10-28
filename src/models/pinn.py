@@ -27,7 +27,7 @@ import torch
 import torch.nn as nn
 
 from src.models.fno import FNO2d
-from src.physics.boundary import compute_boundary_residual_torch
+from src.physics.boundary import compute_boundary_residual_field_torch
 from src.physics.kirchhoff_torch import inverse_kirchhoff_torch
 from src.physics.pde_residual import compute_pde_residual_kirchhoff, compute_pde_residual_physical
 
@@ -217,7 +217,7 @@ class PhysicsInformedFNO2d(nn.Module):
             else:
                 T_ref = 300.0
 
-            bc_loss = compute_boundary_residual_torch(
+            R_boundary = compute_boundary_residual_field_torch(
                 theta_pred=phys_out["theta_phys"],
                 T_pred=T_pred,
                 bc_type_left=meta.get("bc_type_left", meta.get("bc_type_x0")),
@@ -245,7 +245,10 @@ class PhysicsInformedFNO2d(nn.Module):
                 residual_scale=1.0e6,
             )
         else:
-            bc_loss = 0.0 * T_pred.sum()
+            R_boundary = T_pred.sum(dim=(1, 2, 3), keepdim=False).unsqueeze(1).expand(-1, 124) * 0.0
+
+        # Preserve the established loss: mean((R_boundary / 1e6) ** 2).
+        bc_loss = torch.mean((R_boundary / 1.0e6) ** 2)
 
         total_loss = self.w_data * data_loss + self.w_pde * pde_loss + self.w_bc * bc_loss
 
@@ -257,6 +260,7 @@ class PhysicsInformedFNO2d(nn.Module):
             "pred_norm": pred_norm,
             "T_pred": T_pred,
             "R_pde": R_pde,
+            "R_boundary": R_boundary,
             "n_map": phys_out["n_map"],
             "Q_vol": phys_out["Q_vol"],
         }

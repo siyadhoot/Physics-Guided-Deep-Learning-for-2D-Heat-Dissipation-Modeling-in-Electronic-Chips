@@ -56,7 +56,7 @@ def create_boundary_distance_mask(
     return mask
 
 
-def compute_boundary_residual_torch(
+def compute_boundary_residual_field_torch(
     theta_pred: torch.Tensor,
     T_pred: torch.Tensor,
     bc_type_left: Optional[torch.Tensor] = None,
@@ -108,8 +108,9 @@ def compute_boundary_residual_torch(
     outward heat escape through domain boundary faces (Robin, Dirichlet, or Neumann), out-of-plane
     package heat-sink loss, and volumetric heat sources are fully accounted for.
 
-    Returns:
-      Scalar boundary MSE loss normalized by residual_scale (1.0e6 W/m^3 = 1 MW/m^3).
+    Returns the physical boundary residual for the 124 perimeter cells, shape (B, 124),
+    in W/m^3. residual_scale is retained for source compatibility but is applied by
+    compute_boundary_residual_torch when forming the training loss.
     """
     while T_pred.ndim < 4:
         T_pred = T_pred.unsqueeze(0)
@@ -261,8 +262,11 @@ def compute_boundary_residual_torch(
 
     R_boundary = R_cell[boundary_mask.expand_as(R_cell)].view(B, -1)
 
-    # Scaled mean squared residual over boundary cells
-    loss_bc = torch.mean((R_boundary / residual_scale) ** 2)
+    return R_boundary
 
-    return loss_bc
+
+def compute_boundary_residual_torch(*args, residual_scale: float = 1.0e6, **kwargs) -> torch.Tensor:
+    """Existing training loss: mean squared physical residual scaled by residual_scale."""
+    residual = compute_boundary_residual_field_torch(*args, residual_scale=residual_scale, **kwargs)
+    return torch.mean((residual / residual_scale) ** 2)
 
