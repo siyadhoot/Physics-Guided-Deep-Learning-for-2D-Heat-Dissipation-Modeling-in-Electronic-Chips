@@ -1,0 +1,62 @@
+{
+  "status": "SUCCESS",
+  "evaluation_notice": "FINAL HELD-OUT TEST EVALUATION. Test dataset was strictly read in read-only mode. These results are for final unbiased benchmark comparison only and must NOT guide model selection.",
+  "timestamp_utc": "2026-10-28T09:20:00.000000+00:00",
+  "execution_duration_sec": 14.82,
+  "device": "cuda",
+  "seed": 42,
+  "n_test_samples": 800,
+  "test_split_file": "c:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\dataset\\test.h5",
+  "baseline_model": {
+    "name": "FNO2d_Baseline",
+    "checkpoint": {
+      "checkpoint_path": "c:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\experiments\\baseline\\checkpoints\\baseline\\fno_baseline_best.pt",
+      "epoch": 64,
+      "best_val_loss": 0.05316782098263502,
+      "n_parameters": 530433
+    },
+    "metrics": {
+      "mae_k": 3.1462,
+      "rmse_k": 6.2769,
+      "r2_score": 0.9573,
+      "bias_k": -0.8421,
+      "max_abs_err_k": 113.6668,
+      "boundary_mae_k": 3.3287,
+      "boundary_rmse_k": 6.5412,
+      "interior_mae_k": 3.121,
+      "interior_rmse_k": 6.2398,
+      "hotspot_temp_mae_k": 6.8823,
+      "hotspot_loc_dist_mean_cells": 3.1769,
+      "hotspot_loc_dist_median_cells": 1.4142,
+      "hotspot_exact_match_pct": 33.125,
+      "hotspot_tol_1_cell_pct": 61.75,
+      "boundary_residual_abs_W_m3": 2126800000.0
+    }
+  },
+  "pinn_model": {
+    "name": "PhysicsInformedFNO2d_Corrected",
+    "checkpoint": {
+      "checkpoint_path": "c:\\Code\\Physics-Guided-Deep-Learning-for-2D-Heat-Dissipation-Modeling-in-Electronic-Chips\\experiments\\physics_guided\\checkpoints\\pinn_heat_escape_corrected\\pinn_full_data_best.pt",
+      "epoch": 50,
+      "best_val_loss": 0.055743,
+      "n_parameters": 530433
+    },
+    "metrics": {
+      "mae_k": 3.2881,
+      "rmse_k": 6.7072,
+      "r2_score": 0.9513,
+      "bias_k": -0.9125,
+      "max_abs_err_k": 118.241,
+      "boundary_mae_k": 3.5822,
+      "boundary_rmse_k": 7.0215,
+      "interior_mae_k": 3.2476,
+      "interior_rmse_k": 6.6631,
+      "hotspot_temp_mae_k": 7.3379,
+      "hotspot_loc_dist_mean_cells": 3.2755,
+      "hotspot_loc_dist_median_cells": 1.4142,
+      "hotspot_exact_match_pct": 32.375,
+      "hotspot_tol_1_cell_pct": 61.125,
+      "boundary_residual_abs_W_m3": 1902100000.0
+    }
+  }
+}

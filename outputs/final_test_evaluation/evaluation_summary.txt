@@ -1,0 +1,46 @@
+================================================================================
+FINAL TEST-SET EVALUATION REPORT: FNO BASELINE VS. CORRECTED PINN
+================================================================================
+Execution Timestamp (UTC): 2026-10-28T09:20:00.000000+00:00
+Device:                     cuda
+Evaluated Test Samples:     800 samples (dataset/test.h5)
+
+INTEGRITY AND PROTOCOL COMPLIANCE:
+  - Dataset split: Held-out test set (test.h5, 800 samples).
+  - Integrity check: Both models evaluated on IDENTICAL test samples in identical order.
+  - Preprocessing: Inputs normalized using training-only statistics.
+  - Output Space: Predictions transformed back to physical Kelvin via inverse Kirchhoff.
+  - Scientific rule: These test metrics are strictly held-out and must NOT guide tuning.
+
+MODEL CHECKPOINTS:
+  1. Baseline FNO: experiments/baseline/checkpoints/baseline/fno_baseline_best.pt
+     Parameters:   530,433 (Epoch 64)
+  2. Corrected PINN: experiments/physics_guided/checkpoints/pinn_heat_escape_corrected/pinn_full_data_best.pt
+     Parameters:   530,433 (Epoch 50)
+
+================================================================================
+COMPARATIVE TEST PERFORMANCE SUMMARY
+================================================================================
+Metric                                     |    Baseline FNO |  Corrected PINN |  Improvement
+------------------------------------------------------------------------------------------
+Overall Temperature MAE [K]                |          3.1462 |          3.2881 |       -4.51%
+Overall Temperature RMSE [K]               |          6.2769 |          6.7072 |       -6.86%
+R² Score                                   |          0.9573 |          0.9513 |       -0.63%
+Boundary MAE [K]                           |          3.3287 |          3.5822 |       -7.62%
+Interior MAE [K]                           |          3.1210 |          3.2476 |       -4.06%
+Hotspot Peak Temp MAE [K]                  |          6.8823 |          7.3379 |       -6.62%
+Hotspot Mean Location Dist [cells]         |          3.1769 |          3.2755 |       -3.10%
+Hotspot Exact Match [%]                    |         33.1250 |         32.3750 |       -2.26%
+Hotspot 1-Cell Match [%]                   |         61.7500 |         61.1250 |       -1.01%
+Mean Absolute Boundary Residual [W/m³]     |      2.1268e+09 |      1.9021e+09 |      +10.57%
+------------------------------------------------------------------------------------------
+
+KEY FINDINGS & DEFENSE DISCUSSION POINTS:
+  1. Overall Accuracy: Baseline FNO achieves 3.1462 K MAE (R²=0.9573), while Corrected PINN achieves 3.2881 K MAE (R²=0.9513).
+  2. Physical Boundary Fidelity: Corrected PINN achieves a Mean Absolute Boundary Residual of 1.9021e9 W/m³, which is 10.56% lower than Baseline FNO (2.1268e9 W/m³), confirming improved physical boundary conservation.
+  3. Hotspot Localization: Both models achieve high precision, locating hotspots within ~3.2 grid cells (exact match ~33%, within 1 cell ~61.5%).
+  4. Boundary vs. Interior: Both models exhibit higher error along the perimeter boundary (~3.33 K / 3.58 K) compared to the domain interior (~3.12 K / 3.25 K) due to complex edge flux conditions.
+
+================================================================================
+END OF TEST REPORT
+================================================================================

@@ -147,6 +147,64 @@ class TestEvaluateTestSet(unittest.TestCase):
         self.assertNotIn("loss.backward()", content)
         self.assertIn("torch.inference_mode()", content)
 
+    def test_plotting_functions_synthetic(self):
+        """Verify all 5 visualization functions generate valid non-empty images."""
+        import tempfile
+        from experiments.physics_guided.plot_test_evaluation import (
+            plot_figure_1_temperature_fields,
+            plot_figure_2_absolute_error_heatmaps,
+            plot_figure_3_boundary_interior_mae,
+            plot_figure_4_boundary_physics_residual,
+            plot_figure_5_hotspot_comparison,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+
+            T_gt = np.random.uniform(300.0, 350.0, (32, 32))
+            T_fno = T_gt + np.random.normal(0, 3.0, (32, 32))
+            T_pinn = T_gt + np.random.normal(0, 3.0, (32, 32))
+            meta = {"sample_idx": 0, "sample_id": 7200, "T_ambient": 300.0}
+
+            dummy_metrics = {
+                "baseline_model": {
+                    "metrics": {
+                        "mae_k": 3.1462, "boundary_mae_k": 3.3287, "interior_mae_k": 3.1210,
+                        "boundary_residual_abs_W_m3": 2.1268e9,
+                        "hotspot_loc_dist_mean_cells": 3.1769,
+                        "hotspot_exact_match_pct": 33.125, "hotspot_tol_1_cell_pct": 61.750,
+                    }
+                },
+                "pinn_model": {
+                    "metrics": {
+                        "mae_k": 3.2881, "boundary_mae_k": 3.5822, "interior_mae_k": 3.2476,
+                        "boundary_residual_abs_W_m3": 1.9021e9,
+                        "hotspot_loc_dist_mean_cells": 3.2755,
+                        "hotspot_exact_match_pct": 32.375, "hotspot_tol_1_cell_pct": 61.125,
+                    }
+                }
+            }
+
+            p1 = tmp / "fig1.png"
+            plot_figure_1_temperature_fields(T_gt, T_fno, T_pinn, meta, p1, dpi=72)
+            self.assertTrue(p1.exists() and p1.stat().st_size > 0)
+
+            p2 = tmp / "fig2.png"
+            plot_figure_2_absolute_error_heatmaps(T_gt, T_fno, T_pinn, meta, p2, dpi=72)
+            self.assertTrue(p2.exists() and p2.stat().st_size > 0)
+
+            p3 = tmp / "fig3.png"
+            plot_figure_3_boundary_interior_mae(dummy_metrics, p3, dpi=72)
+            self.assertTrue(p3.exists() and p3.stat().st_size > 0)
+
+            p4 = tmp / "fig4.png"
+            plot_figure_4_boundary_physics_residual(dummy_metrics, p4, dpi=72)
+            self.assertTrue(p4.exists() and p4.stat().st_size > 0)
+
+            p5 = tmp / "fig5.png"
+            plot_figure_5_hotspot_comparison(dummy_metrics, p5, dpi=72)
+            self.assertTrue(p5.exists() and p5.stat().st_size > 0)
+
 
 if __name__ == "__main__":
     unittest.main()
